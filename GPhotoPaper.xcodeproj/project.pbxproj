@@ -1,0 +1,593 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2576DC1E2E5758080008C4F3 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 2576DC1D2E5758080008C4F3 /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2576DBF12E574FBD0008C4F3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2576DBDA2E574FBC0008C4F3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2576DBE12E574FBC0008C4F3;
+			remoteInfo = GPhotoPaper;
+		};
+		2576DBFB2E574FBD0008C4F3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2576DBDA2E574FBC0008C4F3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2576DBE12E574FBC0008C4F3;
+			remoteInfo = GPhotoPaper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		2576DBE22E574FBC0008C4F3 /* GPhotoPaper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GPhotoPaper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2576DBF02E574FBD0008C4F3 /* GPhotoPaperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GPhotoPaperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2576DBFA2E574FBD0008C4F3 /* GPhotoPaperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GPhotoPaperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		2576DC202E57581E0008C4F3 /* Exceptions for "GPhotoPaper" folder in "GPhotoPaper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2576DBE12E574FBC0008C4F3 /* GPhotoPaper */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		2576DBE42E574FBC0008C4F3 /* GPhotoPaper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2576DC202E57581E0008C4F3 /* Exceptions for "GPhotoPaper" folder in "GPhotoPaper" target */,
+			);
+			path = GPhotoPaper;
+			sourceTree = "<group>";
+		};
+		2576DBF32E574FBD0008C4F3 /* GPhotoPaperTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GPhotoPaperTests;
+			sourceTree = "<group>";
+		};
+		2576DBFD2E574FBD0008C4F3 /* GPhotoPaperUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GPhotoPaperUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2576DBDF2E574FBC0008C4F3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2576DC1E2E5758080008C4F3 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2576DBED2E574FBD0008C4F3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2576DBF72E574FBD0008C4F3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2576DBD92E574FBC0008C4F3 = {
+			isa = PBXGroup;
+			children = (
+				2576DBE42E574FBC0008C4F3 /* GPhotoPaper */,
+				2576DBF32E574FBD0008C4F3 /* GPhotoPaperTests */,
+				2576DBFD2E574FBD0008C4F3 /* GPhotoPaperUITests */,
+				2576DBE32E574FBC0008C4F3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2576DBE32E574FBC0008C4F3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2576DBE22E574FBC0008C4F3 /* GPhotoPaper.app */,
+				2576DBF02E574FBD0008C4F3 /* GPhotoPaperTests.xctest */,
+				2576DBFA2E574FBD0008C4F3 /* GPhotoPaperUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2576DBE12E574FBC0008C4F3 /* GPhotoPaper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2576DC042E574FBD0008C4F3 /* Build configuration list for PBXNativeTarget "GPhotoPaper" */;
+			buildPhases = (
+				2576DBDE2E574FBC0008C4F3 /* Sources */,
+				2576DBDF2E574FBC0008C4F3 /* Frameworks */,
+				2576DBE02E574FBC0008C4F3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				2576DBE42E574FBC0008C4F3 /* GPhotoPaper */,
+			);
+			name = GPhotoPaper;
+			packageProductDependencies = (
+				2576DC1D2E5758080008C4F3 /* GoogleSignIn */,
+			);
+			productName = GPhotoPaper;
+			productReference = 2576DBE22E574FBC0008C4F3 /* GPhotoPaper.app */;
+			productType = "com.apple.product-type.application";
+		};
+		2576DBEF2E574FBD0008C4F3 /* GPhotoPaperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2576DC072E574FBD0008C4F3 /* Build configuration list for PBXNativeTarget "GPhotoPaperTests" */;
+			buildPhases = (
+				2576DBEC2E574FBD0008C4F3 /* Sources */,
+				2576DBED2E574FBD0008C4F3 /* Frameworks */,
+				2576DBEE2E574FBD0008C4F3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2576DBF22E574FBD0008C4F3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				2576DBF32E574FBD0008C4F3 /* GPhotoPaperTests */,
+			);
+			name = GPhotoPaperTests;
+			packageProductDependencies = (
+			);
+			productName = GPhotoPaperTests;
+			productReference = 2576DBF02E574FBD0008C4F3 /* GPhotoPaperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		2576DBF92E574FBD0008C4F3 /* GPhotoPaperUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2576DC0A2E574FBD0008C4F3 /* Build configuration list for PBXNativeTarget "GPhotoPaperUITests" */;
+			buildPhases = (
+				2576DBF62E574FBD0008C4F3 /* Sources */,
+				2576DBF72E574FBD0008C4F3 /* Frameworks */,
+				2576DBF82E574FBD0008C4F3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2576DBFC2E574FBD0008C4F3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				2576DBFD2E574FBD0008C4F3 /* GPhotoPaperUITests */,
+			);
+			name = GPhotoPaperUITests;
+			packageProductDependencies = (
+			);
+			productName = GPhotoPaperUITests;
+			productReference = 2576DBFA2E574FBD0008C4F3 /* GPhotoPaperUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2576DBDA2E574FBC0008C4F3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					2576DBE12E574FBC0008C4F3 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					2576DBEF2E574FBD0008C4F3 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 2576DBE12E574FBC0008C4F3;
+					};
+					2576DBF92E574FBD0008C4F3 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 2576DBE12E574FBC0008C4F3;
+					};
+				};
+			};
+			buildConfigurationList = 2576DBDD2E574FBC0008C4F3 /* Build configuration list for PBXProject "GPhotoPaper" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 2576DBD92E574FBC0008C4F3;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				2576DC1C2E5758080008C4F3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2576DBE32E574FBC0008C4F3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2576DBE12E574FBC0008C4F3 /* GPhotoPaper */,
+				2576DBEF2E574FBD0008C4F3 /* GPhotoPaperTests */,
+				2576DBF92E574FBD0008C4F3 /* GPhotoPaperUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2576DBE02E574FBC0008C4F3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2576DBEE2E574FBD0008C4F3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2576DBF82E574FBD0008C4F3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2576DBDE2E574FBC0008C4F3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2576DBEC2E574FBD0008C4F3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2576DBF62E574FBD0008C4F3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2576DBF22E574FBD0008C4F3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2576DBE12E574FBC0008C4F3 /* GPhotoPaper */;
+			targetProxy = 2576DBF12E574FBD0008C4F3 /* PBXContainerItemProxy */;
+		};
+		2576DBFC2E574FBD0008C4F3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2576DBE12E574FBC0008C4F3 /* GPhotoPaper */;
+			targetProxy = 2576DBFB2E574FBD0008C4F3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2576DC022E574FBD0008C4F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		2576DC032E574FBD0008C4F3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		2576DC052E574FBD0008C4F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GPhotoPaper/GPhotoPaper.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85M2BTMYV6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GPhotoPaper/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lv.andr.GPhotoPaper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		2576DC062E574FBD0008C4F3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GPhotoPaper/GPhotoPaper.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85M2BTMYV6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GPhotoPaper/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lv.andr.GPhotoPaper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		2576DC082E574FBD0008C4F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lv.andr.GPhotoPaperTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GPhotoPaper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GPhotoPaper";
+			};
+			name = Debug;
+		};
+		2576DC092E574FBD0008C4F3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lv.andr.GPhotoPaperTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GPhotoPaper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GPhotoPaper";
+			};
+			name = Release;
+		};
+		2576DC0B2E574FBD0008C4F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lv.andr.GPhotoPaperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = GPhotoPaper;
+			};
+			name = Debug;
+		};
+		2576DC0C2E574FBD0008C4F3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lv.andr.GPhotoPaperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = GPhotoPaper;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2576DBDD2E574FBC0008C4F3 /* Build configuration list for PBXProject "GPhotoPaper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2576DC022E574FBD0008C4F3 /* Debug */,
+				2576DC032E574FBD0008C4F3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2576DC042E574FBD0008C4F3 /* Build configuration list for PBXNativeTarget "GPhotoPaper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2576DC052E574FBD0008C4F3 /* Debug */,
+				2576DC062E574FBD0008C4F3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2576DC072E574FBD0008C4F3 /* Build configuration list for PBXNativeTarget "GPhotoPaperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2576DC082E574FBD0008C4F3 /* Debug */,
+				2576DC092E574FBD0008C4F3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2576DC0A2E574FBD0008C4F3 /* Build configuration list for PBXNativeTarget "GPhotoPaperUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2576DC0B2E574FBD0008C4F3 /* Debug */,
+				2576DC0C2E574FBD0008C4F3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2576DC1C2E5758080008C4F3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2576DC1D2E5758080008C4F3 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2576DC1C2E5758080008C4F3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 2576DBDA2E574FBC0008C4F3 /* Project object */;
+}
