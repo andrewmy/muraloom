@@ -14,6 +14,10 @@ This document outlines the remaining tasks for the GPhotoPaper macOS application
   - [x] Implement logic to create an album with a unique, human-friendly name ("GPhotoPaper" or "GPhotoPaper - UUID").
   - [x] Persist the ID and name of the app-created album using `UserDefaults`.
   - [x] Display instructions to the user to add photos to the app-created album.
+  - [x] On app start, check that the album is still available.
+  - [x] On retrieving the stored album, check picture count.
+  - [x] If there are no pictures, show a warning.
+  - [x] Add a link to quickly access the album wherever it is mentioned.
 
 - [x] **Settings User Interface (UI)**
   - [x] Display UI for "Create/Manage App Album".
@@ -22,6 +26,7 @@ This document outlines the remaining tasks for the GPhotoPaper macOS application
   - [x] Implement UI for choosing minimum picture width (default to desktop resolution).
   - [x] Implement UI for choosing wallpaper fill mode ("Fill", "Fit", "Stretch", "Center").
   - [x] Implement a button to change the wallpaper immediately.
+  - [x] Refresh picture count on "Change Wallpaper Now" button click.
 
 - [x] **Core Wallpaper Functionality**
   - [x] Implement logic to fetch photos from the app-created album using `photoslibrary.readonly.appcreateddata` scope.
@@ -40,5 +45,3 @@ This document outlines the remaining tasks for the GPhotoPaper macOS application
 - [x] Keychain Sharing capability enabled.
 - [x] App Sandbox capability enabled.
 - [x] Create a comprehensive GitHub-friendly `README.md` file for humans. Include instructions on how to build and run the project, and what to do manually in the console or Xcode, and values to change in the code.
-
----
