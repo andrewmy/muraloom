@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var authService: GoogleAuthService
-    @StateObject private var settings = SettingsModel() // Create an instance of settings
+    @EnvironmentObject var settings: SettingsModel
 
     var body: some View {
         VStack {

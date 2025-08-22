@@ -50,7 +50,7 @@ class WallpaperManager: ObservableObject {
 
         do {
             let mediaItems = try await photosService.searchPhotos(in: albumId)
-            guard !mediaItems.isEmpty else {
+            if mediaItems.isEmpty {
                 print("No photos found in the album.")
                 return
             }

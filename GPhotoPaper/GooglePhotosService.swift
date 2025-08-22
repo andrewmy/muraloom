@@ -44,7 +44,7 @@ struct VideoMetadata: Decodable {
 }
 
 struct SearchMediaItemsResponse: Decodable {
-    let mediaItems: [MediaItem]
+    let mediaItems: [MediaItem]?
     let nextPageToken: String?
 }
 
@@ -98,21 +98,15 @@ class GooglePhotosService: ObservableObject {
         let newAlbum = NewAlbum(album: NewAlbumContent(title: albumName))
         request.httpBody = try JSONEncoder().encode(newAlbum)
 
-        print("DEBUG: Creating album URL: \(url.absoluteString)")
-        print("DEBUG: Creating album Body: \(String(data: request.httpBody!, encoding: .utf8) ?? "N/A")")
-
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             let responseBody = String(data: data, encoding: .utf8) ?? "N/A"
-            print("DEBUG: Create Album Error Response: \(responseBody)")
             throw GooglePhotosServiceError.networkError(statusCode: statusCode, response: responseBody)
         }
-        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
         let responseBody = String(data: data, encoding: .utf8) ?? "N/A"
-        print("DEBUG: Create Album Response: \(responseBody)")
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -130,7 +124,6 @@ class GooglePhotosService: ObservableObject {
         }
 
         let accessToken = try await user.refreshTokensIfNeeded().accessToken.tokenString
-        print("DEBUG: Access Token for List Albums: \(accessToken)")
 
         guard let url = URL(string: "\(baseURL)/albums") else {
             throw GooglePhotosServiceError.invalidURL
@@ -143,16 +136,13 @@ class GooglePhotosService: ObservableObject {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        print("DEBUG: List Albums Raw Data: \(String(data: data, encoding: .utf8) ?? "N/A")")
         if let httpResponse = response as? HTTPURLResponse {
-            print("DEBUG: List Albums HTTP Status Code: \(httpResponse.statusCode)")
         }
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             let responseBody = String(data: data, encoding: .utf8) ?? "N/A"
-            print("DEBUG: List Albums Error Response: \(responseBody)")
             throw GooglePhotosServiceError.networkError(statusCode: statusCode, response: responseBody)
         }
 
@@ -166,7 +156,6 @@ class GooglePhotosService: ObservableObject {
                 return listAlbumsResponse.albums ?? []
             }
         } catch {
-            print("DEBUG: Decoding Error List Albums: \(error.localizedDescription)")
             throw GooglePhotosServiceError.decodingError(error)
         }
     }
@@ -190,24 +179,9 @@ class GooglePhotosService: ObservableObject {
 
         let requestBody: [String: Any] = [
             "albumId": albumId,
-            "pageSize": 100, // Request up to 100 media items
-            "filters": [
-                "mediaTypeFilter": [
-                    "mediaTypes": ["PHOTO"]
-                ],
-                "featureFilter": [
-                    "includedFeatures": ["AUTOCREATED"]
-                ],
-                "contentFilter": [
-                    "minWidth": settings.minimumPictureWidth,
-                    "minHeight": settings.minimumPictureWidth // Assuming square for min height for now, will adjust if needed
-                ]
-            ]
+            "pageSize": 100 // Request up to 100 media items
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody, options: [])
-
-        print("DEBUG: Requesting URL for search: \(url.absoluteString)")
-        print("DEBUG: Request Body for search: \(String(data: request.httpBody!, encoding: .utf8) ?? "N/A")")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -215,7 +189,6 @@ class GooglePhotosService: ObservableObject {
               (200...299).contains(httpResponse.statusCode) else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             let responseBody = String(data: data, encoding: .utf8) ?? "N/A"
-            print("DEBUG: Network Error Response for search: \(responseBody)")
             throw GooglePhotosServiceError.networkError(statusCode: statusCode, response: responseBody)
         }
 
@@ -223,7 +196,7 @@ class GooglePhotosService: ObservableObject {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         do {
             let searchResponse = try decoder.decode(SearchMediaItemsResponse.self, from: data)
-            var mediaItems = searchResponse.mediaItems
+            var mediaItems = searchResponse.mediaItems ?? []
             
             if settings.horizontalPhotosOnly {
                 mediaItems = mediaItems.filter { item in
@@ -235,7 +208,6 @@ class GooglePhotosService: ObservableObject {
             
             return mediaItems
         } catch {
-            print("DEBUG: Decoding Error for search: \(error.localizedDescription)")
             throw GooglePhotosServiceError.decodingError(error)
         }
     }

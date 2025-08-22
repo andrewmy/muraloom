@@ -44,6 +44,9 @@ class GoogleAuthService: ObservableObject {
     func signOut() {
         GIDSignIn.sharedInstance.signOut()
         self.user = nil
+        // Clear the album ID and name from UserDefaults
+        UserDefaults.standard.removeObject(forKey: "appCreatedAlbumId")
+        UserDefaults.standard.removeObject(forKey: "appCreatedAlbumName")
     }
 
     func restorePreviousSignIn() {
