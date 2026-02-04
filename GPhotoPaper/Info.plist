@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>OneDriveClientId</key>
+	<string>$(ONEDRIVE_CLIENT_ID)</string>
+	<!-- Set this in GPhotoPaper/Secrets.xcconfig (gitignored) or in Xcode build settings. -->
+	<key>OneDriveRedirectUri</key>
+	<string>msauth.$(PRODUCT_BUNDLE_IDENTIFIER)://auth</string>
+	<key>OneDriveScopes</key>
+	<string>User.Read Files.Read</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -9,12 +16,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<!--
-				     OneDrive/Microsoft identity integration is not yet implemented.
-				     When adding OAuth callback handling, replace this placeholder with the
-				     scheme required by your chosen library/flow.
-				-->
-				<string>gphotopaper</string>
+				<string>msauth.$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
 	</array>

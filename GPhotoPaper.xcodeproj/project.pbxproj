@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		25A0D1C12F0B4C3D00A1B2C3 /* MSAL in Frameworks */ = {isa = PBXBuildFile; productRef = 25A0D1C32F0B4C3D00A1B2C3 /* MSAL */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,6 +31,7 @@
 		2576DBE22E574FBC0008C4F3 /* GPhotoPaper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GPhotoPaper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2576DBF02E574FBD0008C4F3 /* GPhotoPaperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GPhotoPaperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2576DBFA2E574FBD0008C4F3 /* GPhotoPaperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GPhotoPaperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		25A0D1D02F0B7A6C00A1B2C3 /* GPhotoPaper/Config.xcconfig */ = {isa = PBXFileReference; explicitFileType = text.xcconfig; path = GPhotoPaper/Config.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -68,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				25A0D1C12F0B4C3D00A1B2C3 /* MSAL in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,6 +98,7 @@
 				2576DBF32E574FBD0008C4F3 /* GPhotoPaperTests */,
 				2576DBFD2E574FBD0008C4F3 /* GPhotoPaperUITests */,
 				2576DBE32E574FBC0008C4F3 /* Products */,
+				25C0AF062F34A5C400B13035 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -106,6 +110,14 @@
 				2576DBFA2E574FBD0008C4F3 /* GPhotoPaperUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		25C0AF062F34A5C400B13035 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				25A0D1D02F0B7A6C00A1B2C3 /* GPhotoPaper/Config.xcconfig */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -128,6 +140,7 @@
 			);
 			name = GPhotoPaper;
 			packageProductDependencies = (
+				25A0D1C32F0B4C3D00A1B2C3 /* MSAL */,
 			);
 			productName = GPhotoPaper;
 			productReference = 2576DBE22E574FBC0008C4F3 /* GPhotoPaper.app */;
@@ -212,6 +225,7 @@
 			mainGroup = 2576DBD92E574FBC0008C4F3;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2576DBE32E574FBC0008C4F3 /* Products */;
@@ -407,6 +421,7 @@
 		};
 		2576DC052E574FBD0008C4F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 25A0D1D02F0B7A6C00A1B2C3 /* GPhotoPaper/Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -435,6 +450,7 @@
 		};
 		2576DC062E574FBD0008C4F3 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 25A0D1D02F0B7A6C00A1B2C3 /* GPhotoPaper/Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -566,6 +582,24 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AzureAD/microsoft-authentication-library-for-objc";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		25A0D1C32F0B4C3D00A1B2C3 /* MSAL */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */;
+			productName = MSAL;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2576DBDA2E574FBC0008C4F3 /* Project object */;
 }

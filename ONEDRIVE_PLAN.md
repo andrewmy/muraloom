@@ -1,52 +1,103 @@
 # OneDrive Integration Battle Plan
 
-This document outlines the detailed plan to integrate OneDrive for photo management, replacing the current Google Photos integration.
+This document outlines the plan to integrate OneDrive for photo management, targeting **personal Microsoft accounts** and using **Microsoft Graph Albums (bundles)** as the primary wallpaper source.
 
-## Phase 1: OneDrive API Integration (Backend)
+## Current status (repo)
 
-1.  **OneDrive Authentication Service (`OneDriveAuthService.swift`):**
-    *   **Research:** Identify the correct OAuth 2.0 flow for macOS applications to authenticate with OneDrive (Microsoft Graph API). This will likely involve registering an application with Microsoft Azure AD.
-    *   **Implementation:**
-        *   Create a new `OneDriveAuthService` class (similar to `GoogleAuthService`).
-        *   Implement methods for signing in, signing out, and refreshing access tokens.
-        *   Handle URL callbacks for OAuth redirection.
-        *   Store authentication tokens securely (e.g., Keychain).
+- Repo is aligned to OneDrive (Google Sign-In removed).
+- Core wallpaper pipeline exists (`WallpaperManager`) and settings UI exists.
+- Implemented:
+  - `OneDriveAuthService`: **MSAL** wrapper (interactive sign-in, silent token acquisition, sign-out).
+  - `OneDrivePhotosService`: Microsoft Graph v1.0 for **folders** (list root folders, verify folder, fetch photos in a folder).
+  - Settings UI: sign-in + basic **folder** selection.
+- CLI builds: `xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' ... build` succeeds when the environment has keychain/signing access.
 
-2.  **OneDrive Photos Service (`OneDrivePhotosService.swift`):**
-    *   **Research:** Understand Microsoft Graph API endpoints for listing albums/folders, creating albums/folders, and fetching photos within a specific album/folder.
-    *   **Implementation:**
-        *   Create a new `OneDrivePhotosService` class (similar to `GooglePhotosService`).
-        *   Implement methods for:
-            *   `listAlbums()`: To retrieve a list of photo albums/folders from OneDrive.
-            *   `createAlbum(name: String)`: To create a new album/folder.
-            *   `searchPhotos(in albumId: String)`: To fetch media items (photos) from a specified album/folder.
-            *   `verifyAlbumExists(albumId: String)`: To check if a given album/folder still exists.
-        *   Handle API errors and network issues gracefully.
+### What works today (folder mode)
 
-## Phase 2: UI and App Logic Adaptation (Frontend)
+- Sign in/out (MSAL) and silent token acquisition for scheduled wallpaper updates.
+- List root folders, select a folder, and fetch image items from that folder via Graph.
+- Wallpaper update:
+  - Downloads `@microsoft.graph.downloadUrl`
+  - Applies filtering (min width, horizontal only) when image dimensions are available
 
-1.  **Update `GPhotoPaperApp.swift`:**
-    *   Replace `GoogleAuthService` and `GooglePhotosService` with `OneDriveAuthService` and `OneDrivePhotosService`.
-    *   Adjust initialization and environment object passing to use the new OneDrive services.
-    *   Modify the `onAppear` and `onChange(of: authService.user)` blocks to use the OneDrive album verification and photo counting logic.
+### Configuration keys (current)
 
-2.  **Update `SettingsModel.swift`:**
-    *   Remove Google Photos specific properties (e.g., `appCreatedAlbumId`, `appCreatedAlbumName`, `appCreatedAlbumProductUrl`) if they are tightly coupled to Google Photos.
-    *   Add new properties for OneDrive album ID, name, and URL.
+`Info.plist` currently expects:
 
-3.  **Update `SettingsView.swift`:**
-    *   **Authentication UI:** Replace Google Sign-In button with OneDrive Sign-In.
-    *   **Album Management UI:**
-        *   Replace "Create New Album" with options to "Select Existing Album" or "Create New Album" for OneDrive.
-        *   Implement UI to display a list of OneDrive albums/folders for user selection.
-        *   Update the warning messages and album link display to reflect OneDrive album details.
-    *   Ensure the "Change Wallpaper Now" button correctly triggers the OneDrive photo fetching and wallpaper update.
+- `OneDriveClientId`
+- `OneDriveRedirectUri`
+- `OneDriveScopes` (space-separated)
+- Optional: `OneDriveAuthorityHost` (default `login.microsoftonline.com`), `OneDriveTenant` (default `common`)
 
-4.  **Update `WallpaperManager.swift`:**
-    *   Ensure it uses the `OneDrivePhotosService` to fetch photos. The core logic for setting wallpaper and filtering should remain largely the same.
+## Decisions (locked in)
 
-## Phase 3: Cleanup and Testing
+1. **Auth library:** MSAL (Microsoft Authentication Library).
+  - Other providers may use AppAuth or other mechanism
+2. **Wallpaper source:** OneDrive **Albums** (Graph “bundle album”) instead of folders.
 
-1.  **Remove Google Photos related code:** Delete `GoogleAuthService.swift`, `GooglePhotosService.swift`, and any other Google Photos specific code.
-2.  **Update `Info.plist`:** Remove Google Sign-In URL schemes and add any necessary OneDrive URL schemes or permissions.
-3.  **Testing:** Thoroughly test OneDrive authentication, album selection/creation, photo fetching, and wallpaper updates.
+## What “album” means in Graph
+
+- Album is a **bundle**: a `driveItem` with `bundle.album` facet.
+- Listing albums: `GET /drive/bundles?$filter=bundle/album ne null`
+- Album contents: `GET /drive/items/{bundle-id}?expand=children` (page via `children@odata.nextLink`)
+- Creating / modifying albums requires write scopes:
+  - Create: `POST /drive/bundles` with `bundle: { album: {} }`
+  - Add/remove item: `POST /drive/bundles/{id}/children` / `DELETE /drive/bundles/{id}/children/{item-id}`
+
+Note: Bundle/album APIs are **personal Microsoft account** focused. If we later want to support work/school tenants, plan a fallback source mode (folder selection or in-app “virtual set”).
+
+## Remaining work (phased)
+
+### Phase 1 — Switch auth to MSAL
+
+- Add MSAL dependency (SwiftPM).
+- Implement `OneDriveAuthService` as an MSAL wrapper:
+  - Interactive sign-in + sign-out
+  - Silent token acquisition for scheduled wallpaper updates
+  - Multiple accounts: decide whether to support now or later (MSAL makes this easier).
+- Update configuration:
+  - Replace the current `OneDriveClientId`/redirect scheme placeholders with MSAL-required redirect URI scheme.
+  - Document required Azure app registration settings for a macOS public client.
+- Cleanup:
+  - Remove the native `ASWebAuthenticationSession` + PKCE fallback once MSAL is stable.
+
+### Phase 2 — Albums API (Graph bundles)
+
+- Update the service layer:
+  - Add `listAlbums()`, `verifyAlbumExists(albumId:)`, `searchPhotos(in albumId:)` (album contents).
+  - Keep folder-based methods only as an optional fallback mode (or remove if not needed).
+- Update models:
+  - Rename settings from folder to album: `selectedAlbumId`, `selectedAlbumName`, `selectedAlbumWebUrl`.
+  - Ensure picture metadata is captured (`width/height`) to support filtering in `WallpaperManager`.
+- Scopes:
+  - Start: `User.Read Files.Read` (MSAL handles OIDC reserved scopes like `offline_access` automatically)
+  - Add later if needed: `Files.ReadWrite` (create album / add items).
+
+### Phase 3 — UI update (albums instead of folders)
+
+- Replace the folder picker with an album picker:
+  - “Load albums” → list bundles
+  - Selection persisted in settings
+  - Link to open the album (if `webUrl` is available from bundle metadata)
+- Startup behavior / validation:
+  - On app start, verify the previously selected album still exists and is accessible.
+  - When loading a stored selection, fetch photo count (or first page) and show a warning if the album has no photos.
+- Optional:
+  - Create album UI (requires `Files.ReadWrite`)
+  - Add item to album from within the app (also `Files.ReadWrite`), if we want to support curation without leaving the app.
+
+### Phase 4 — Testing & hardening
+
+- Unit tests:
+  - Token handling boundaries (signed out, expired token) via mocks.
+  - Album paging and filtering logic.
+- UX checks:
+  - Error messaging for “not configured” vs “not signed in” vs “no albums/photos”.
+  - Behavior when album disappears or loses permissions.
+- Multi-monitor support (later): decide per-screen vs all screens.
+
+## Cleanup checklist
+
+- Remove folder-centric UI/strings once albums are the default.
+- Remove native OAuth implementation once MSAL is fully wired.
+- Ensure `Info.plist` contains only the final OAuth callback configuration and documented keys.

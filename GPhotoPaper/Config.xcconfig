@@ -1,0 +1,7 @@
+// Shared build settings for local development.
+// Optional include: copy `Secrets.xcconfig.example` -> `Secrets.xcconfig` (gitignored).
+#include? "Secrets.xcconfig"
+
+// If you don't provide a value in `Secrets.xcconfig`, sign-in will show "not configured".
+ONEDRIVE_CLIENT_ID = YOUR_ONEDRIVE_CLIENT_ID
+

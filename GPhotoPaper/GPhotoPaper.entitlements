@@ -11,6 +11,8 @@
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)lv.andr.GPhotoPaper</string>
+		<!-- MSAL default token cache group on macOS -->
+		<string>$(AppIdentifierPrefix)com.microsoft.identity.universalstorage</string>
 	</array>
 </dict>
 </plist>

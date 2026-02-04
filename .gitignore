@@ -111,6 +111,9 @@
 /GPhotoPaper.xpc.dSYM
 /GPhotoPaper.xpc.dSYM.zip
 /GPhotoPaper.xpc.zip
+
+# Local secrets
+GPhotoPaper/Secrets.xcconfig
 /GPhotoPaper.framework
 /GPhotoPaper.framework.dSYM
 /GPhotoPaper.framework.dSYM.zip

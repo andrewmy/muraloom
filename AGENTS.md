@@ -1,24 +1,46 @@
-# Gemini Development Instructions
+## Repo guidance (Codex / contributors)
 
-Please follow these guidelines when contributing to this repository:
+### Product direction
 
-## General Guidelines
+- Target integration is **OneDrive** (Microsoft Graph) for **personal Microsoft accounts**.
+- Source of truth for roadmap/decisions: `ONEDRIVE_PLAN.md`.
+- Locked-in direction:
+  - Auth: **MSAL**
+  - Wallpaper source: **OneDrive Albums** (Graph bundle albums), not folders
 
-- This project is a macOS application for switching wallpapers on the Mac using pictures from a OneDrive folder (via Microsoft Graph)
-- The code should use the latest available Swift language and library versions
-- Always consider multiple different aproaches, and choose the best one.
-- Add code comments only for complex or unintuitive code
-- Error messages must be concise but very precise
-- Always first present the action plan to the user and only proceed with code changes after confirmation
-- Write informative but concise git commit messages. If multi-line messages are impossible, write a detailed message while staying in a single line
-- Before beginning to build anything dependent on an external API, make sure the endpoint is available, its permissions are still active, and what are its inputs and outputs.
-- If there is something to be done by the user, outline all manual steps.
-- Continuously offer opportunities to improve `GEMINI.md` based on user interaction and feedback.
+### Builds
 
-## Tool Usage Guidelines
+- CLI build:
+  - `xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata build`
+- If CLI builds fail with signing/keychain errors but Xcode builds work:
+  - Ensure Xcode is signed into your Apple ID and the target has a Team + “Automatically manage signing”.
+  - Some sandboxed/automation environments may need elevated permissions to access signing certificates.
+  - For a “compile-only” sanity check in CI, you can use `CODE_SIGNING_ALLOWED=NO` (won’t produce a runnable signed app).
 
-- **Always prioritize user instructions.**
-- **For file modifications, prefer `write_file` over `replace`, as `replace` has been proven unreliable.**
-- **Provide clear, concise explanations for any actions taken.**
-- **Request user verification after significant changes.**
-- **Test each set of changes using `xcodebuild -scheme GPhotoPaper build`.**
+### Current implementation status
+
+- Present today (working): native OAuth (`ASWebAuthenticationSession` + PKCE) + **folder-based** Graph fetching.
+- Transitional code to expect refactors:
+  - `OneDriveAuthService` will become an MSAL wrapper.
+  - `OneDrivePhotosService` will switch from folders to **album bundles** (`/drive/bundles`).
+
+### Config & scopes (today)
+
+- `Info.plist` keys used by the current native OAuth path:
+  - `OneDriveClientId`, `OneDriveRedirectUri`, `OneDriveScopes`
+- Default read-only scope set for wallpaper fetching:
+  - `User.Read offline_access Files.Read`
+- Only add `Files.ReadWrite` if/when implementing album creation or adding/removing items via the app.
+
+### Code style
+
+- Keep services behind protocols where it helps testability (`PhotosService`).
+- Prefer concise errors and minimal UI state in views.
+
+### Context
+
+Always use context7 when I need code generation, setup or configuration steps, or
+library/API documentation. This means you should automatically use the Context7 MCP
+tools to resolve library id and get library docs without me having to explicitly ask.
+
+Always use serena for code features which would benefit from LSP.

@@ -3,16 +3,21 @@ import SwiftUI
 @main
 struct GPhotoPaperApp: App {
     @StateObject private var settings: SettingsModel
+    @StateObject private var authService: OneDriveAuthService
+    @StateObject private var photosService: OneDrivePhotosService
     @StateObject private var wallpaperManager: WallpaperManager
 
     init() {
         let settings = SettingsModel()
+        let authService = OneDriveAuthService()
+        let photosService = OneDrivePhotosService(authService: authService)
         _settings = StateObject(wrappedValue: settings)
+        _authService = StateObject(wrappedValue: authService)
+        _photosService = StateObject(wrappedValue: photosService)
 
-        // TODO: Replace DummyOneDrivePhotosService with a real Microsoft Graph implementation.
         _wallpaperManager = StateObject(
             wrappedValue: WallpaperManager(
-                photosService: DummyOneDrivePhotosService(),
+                photosService: photosService,
                 settings: settings
             )
         )
@@ -22,11 +27,13 @@ struct GPhotoPaperApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(settings)
+                .environmentObject(authService)
+                .environmentObject(photosService)
                 .environmentObject(wallpaperManager)
                 .onAppear {
                     wallpaperManager.startWallpaperUpdates()
                 }
-                .onChange(of: settings.changeFrequency) { _ in
+                .onChange(of: settings.changeFrequency) { _, _ in
                     wallpaperManager.startWallpaperUpdates()
                 }
         }
