@@ -12,7 +12,8 @@ Please follow these guidelines when contributing to this repository:
 - Always first present the action plan to the user and only proceed with code changes after confirmation
 - Write informative but concise git commit messages. If multi-line messages are impossible, write a detailed message while staying in a single line
 - Before beginning to build anything dependent on an external API, make sure the endpoint is available, its permissions are still active, and what are its inputs and outputs.
-
+- If there is something to be done by the user, outline all manual steps.
+- Continuously offer opportunities to improve `GEMINI.md` based on user interaction and feedback.
 
 ## Tool Usage Guidelines
 

@@ -2,11 +2,11 @@ import AppKit // For NSWorkspace
 import Foundation
 
 class WallpaperManager: ObservableObject {
-    private let photosService: GooglePhotosService
+    private let photosService: DummyPhotosService
     private let settings: SettingsModel
     private var wallpaperTimer: Timer?
 
-    init(photosService: GooglePhotosService, settings: SettingsModel) {
+    init(photosService: DummyPhotosService, settings: SettingsModel) {
         self.photosService = photosService
         self.settings = settings
     }
