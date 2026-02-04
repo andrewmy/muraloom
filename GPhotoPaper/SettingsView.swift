@@ -6,10 +6,23 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("OneDrive Album")) {
-                Text("OneDrive integration is not yet implemented.")
-                Button("Sign In with OneDrive") {
-                    // TODO: Implement OneDrive sign-in
+            Section(header: Text("OneDrive Folder")) {
+                Text("OneDrive integration is not yet implemented. For now, you can set a folder ID manually (used by the future Graph client).")
+
+                TextField(
+                    "Folder ID",
+                    text: Binding(
+                        get: { settings.selectedFolderId ?? "" },
+                        set: { settings.selectedFolderId = $0.isEmpty ? nil : $0 }
+                    )
+                )
+
+                if let name = settings.selectedFolderName, !name.isEmpty {
+                    Text("Selected: \(name)")
+                }
+
+                if let url = settings.selectedFolderWebUrl {
+                    Link("Open in OneDrive", destination: url)
                 }
             }
 

@@ -26,10 +26,10 @@ class SettingsModel: ObservableObject {
     @Published var horizontalPhotosOnly: Bool { didSet { saveSettings() } }
     @Published var wallpaperFillMode: WallpaperFillMode { didSet { saveSettings() } }
 
-    // App-created album ID for persistent storage
-    @Published var appCreatedAlbumId: String? { didSet { saveSettings() } }
-    @Published var appCreatedAlbumName: String? { didSet { saveSettings() } }
-    @Published var appCreatedAlbumProductUrl: URL? { didSet { saveSettings() } }
+    // OneDrive folder selection (persisted)
+    @Published var selectedFolderId: String? { didSet { saveSettings() } }
+    @Published var selectedFolderName: String? { didSet { saveSettings() } }
+    @Published var selectedFolderWebUrl: URL? { didSet { saveSettings() } }
     @Published var lastPickedIndex: Int { didSet { saveSettings() } }
     @Published var albumPictureCount: Int = 0
     @Published var showNoPicturesWarning: Bool = false
@@ -41,8 +41,9 @@ class SettingsModel: ObservableObject {
         self.minimumPictureWidth = initialMinimumPictureWidth == 0.0 ? Double(NSScreen.main?.frame.width ?? 1920.0) : initialMinimumPictureWidth
         self.horizontalPhotosOnly = UserDefaults.standard.bool(forKey: "horizontalPhotosOnly")
         self.wallpaperFillMode = UserDefaults.standard.string(forKey: "wallpaperFillMode").flatMap(WallpaperFillMode.init(rawValue:)) ?? .fill
-        self.appCreatedAlbumId = UserDefaults.standard.string(forKey: "appCreatedAlbumId")
-        self.appCreatedAlbumName = UserDefaults.standard.string(forKey: "appCreatedAlbumName")
+        self.selectedFolderId = UserDefaults.standard.string(forKey: "selectedFolderId")
+        self.selectedFolderName = UserDefaults.standard.string(forKey: "selectedFolderName")
+        self.selectedFolderWebUrl = UserDefaults.standard.string(forKey: "selectedFolderWebUrl").flatMap(URL.init(string:))
         self.lastPickedIndex = UserDefaults.standard.integer(forKey: "lastPickedIndex")
     }
 
@@ -52,8 +53,9 @@ class SettingsModel: ObservableObject {
         UserDefaults.standard.set(minimumPictureWidth, forKey: "minimumPictureWidth")
         UserDefaults.standard.set(horizontalPhotosOnly, forKey: "horizontalPhotosOnly")
         UserDefaults.standard.set(wallpaperFillMode.rawValue, forKey: "wallpaperFillMode")
-        UserDefaults.standard.set(appCreatedAlbumId, forKey: "appCreatedAlbumId")
-        UserDefaults.standard.set(appCreatedAlbumName, forKey: "appCreatedAlbumName")
+        UserDefaults.standard.set(selectedFolderId, forKey: "selectedFolderId")
+        UserDefaults.standard.set(selectedFolderName, forKey: "selectedFolderName")
+        UserDefaults.standard.set(selectedFolderWebUrl?.absoluteString, forKey: "selectedFolderWebUrl")
         UserDefaults.standard.set(lastPickedIndex, forKey: "lastPickedIndex")
     }
 }

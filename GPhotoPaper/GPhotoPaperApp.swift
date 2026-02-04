@@ -2,55 +2,58 @@ import SwiftUI
 
 @main
 struct GPhotoPaperApp: App {
-    @State private var settings = SettingsModel()
-    // TODO: Implement these services
-    // @StateObject private var authService = OneDriveAuthService()
-    // @State private var photosService: OneDrivePhotosService
-    @State private var wallpaperManager: WallpaperManager
+    @StateObject private var settings: SettingsModel
+    @StateObject private var wallpaperManager: WallpaperManager
 
     init() {
         let settings = SettingsModel()
-        _settings = State(wrappedValue: settings)
+        _settings = StateObject(wrappedValue: settings)
 
-        // TODO: Initialize with proper OneDrive services
-        // let photosService = OneDrivePhotosService(authService: authService, settings: settings)
-        // _photosService = State(wrappedValue: photosService)
-
-        // TODO: Update WallpaperManager to not depend on a photos service directly
-        //       or create a protocol that both GooglePhotosService and OneDrivePhotosService can conform to.
-        // _wallpaperManager = State(wrappedValue: WallpaperManager(photosService: photosService, settings: settings))
-        _wallpaperManager = State(wrappedValue: WallpaperManager(photosService: DummyPhotosService(), settings: settings))
+        // TODO: Replace DummyOneDrivePhotosService with a real Microsoft Graph implementation.
+        _wallpaperManager = StateObject(
+            wrappedValue: WallpaperManager(
+                photosService: DummyOneDrivePhotosService(),
+                settings: settings
+            )
+        )
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(settings)
-                // .environmentObject(authService)
-                // .environmentObject(photosService)
                 .environmentObject(wallpaperManager)
+                .onAppear {
+                    wallpaperManager.startWallpaperUpdates()
+                }
+                .onChange(of: settings.changeFrequency) { _ in
+                    wallpaperManager.startWallpaperUpdates()
+                }
         }
     }
 }
 
-// Dummy service to avoid compilation errors
-class DummyPhotosService {
-    func searchPhotos(in albumId: String) async throws -> [MediaItem] {
-        return []
-    }
-
-    func verifyAlbumExists(albumId: String) async throws -> Album? {
-        return nil
-    }
+protocol PhotosService {
+    func searchPhotos(in folderId: String) async throws -> [MediaItem]
+    func verifyFolderExists(folderId: String) async throws -> OneDriveFolder?
 }
 
-// These are placeholders and will be implemented later
+// Dummy service to keep the app building until OneDrive integration is implemented.
+final class DummyOneDrivePhotosService: PhotosService {
+    func searchPhotos(in folderId: String) async throws -> [MediaItem] { [] }
+    func verifyFolderExists(folderId: String) async throws -> OneDriveFolder? { nil }
+}
+
+// These are placeholders and will be implemented with Microsoft Graph responses later.
 struct MediaItem: Codable, Identifiable {
     var id: String
-    var baseUrl: URL
+    var downloadUrl: URL
+    var pixelWidth: Int?
+    var pixelHeight: Int?
 }
 
-struct Album: Codable {
+struct OneDriveFolder: Codable {
     var id: String
-    var productUrl: String
+    var webUrl: URL?
+    var name: String?
 }

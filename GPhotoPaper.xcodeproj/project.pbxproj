@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2576DC1E2E5758080008C4F3 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 2576DC1D2E5758080008C4F3 /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,7 +68,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2576DC1E2E5758080008C4F3 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,7 +128,6 @@
 			);
 			name = GPhotoPaper;
 			packageProductDependencies = (
-				2576DC1D2E5758080008C4F3 /* GoogleSignIn */,
 			);
 			productName = GPhotoPaper;
 			productReference = 2576DBE22E574FBC0008C4F3 /* GPhotoPaper.app */;
@@ -215,7 +212,6 @@
 			mainGroup = 2576DBD92E574FBC0008C4F3;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				2576DC1C2E5758080008C4F3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2576DBE32E574FBC0008C4F3 /* Products */;
@@ -570,24 +566,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		2576DC1C2E5758080008C4F3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 9.0.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		2576DC1D2E5758080008C4F3 /* GoogleSignIn */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2576DC1C2E5758080008C4F3 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
-			productName = GoogleSignIn;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2576DBDA2E574FBC0008C4F3 /* Project object */;
 }

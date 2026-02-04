@@ -1,12 +1,13 @@
 import AppKit // For NSWorkspace
 import Foundation
 
-class WallpaperManager: ObservableObject {
-    private let photosService: DummyPhotosService
+@MainActor
+final class WallpaperManager: ObservableObject {
+    private let photosService: any PhotosService
     private let settings: SettingsModel
     private var wallpaperTimer: Timer?
 
-    init(photosService: DummyPhotosService, settings: SettingsModel) {
+    init(photosService: any PhotosService, settings: SettingsModel) {
         self.photosService = photosService
         self.settings = settings
     }
@@ -43,38 +44,41 @@ class WallpaperManager: ObservableObject {
     }
 
     func updateWallpaper() async {
-        guard let albumId = settings.appCreatedAlbumId else {
-            print("Error: No album ID found to fetch photos.")
+        guard let folderId = settings.selectedFolderId, !folderId.isEmpty else {
+            print("Error: No OneDrive folder ID configured.")
             return
         }
 
         do {
-            let mediaItems = try await photosService.searchPhotos(in: albumId)
-            if mediaItems.isEmpty {
-                print("No photos found in the album.")
+            let mediaItems = try await photosService.searchPhotos(in: folderId)
+            let filteredItems = filterMediaItems(mediaItems)
+            if filteredItems.isEmpty {
+                print("No photos found after applying filters.")
                 return
             }
 
             let selectedPhoto: MediaItem
             if settings.pickRandomly {
-                selectedPhoto = mediaItems.randomElement()!
+                guard let randomItem = filteredItems.randomElement() else { return }
+                selectedPhoto = randomItem
             } else {
                 // Sequential picking
-                let nextIndex = (settings.lastPickedIndex + 1) % mediaItems.count
-                selectedPhoto = mediaItems[nextIndex]
+                let nextIndex = (settings.lastPickedIndex + 1) % filteredItems.count
+                selectedPhoto = filteredItems[nextIndex]
                 settings.lastPickedIndex = nextIndex
             }
 
-            let imageUrl = selectedPhoto.baseUrl
+            let imageUrl = selectedPhoto.downloadUrl
 
-            let tempDirectory = FileManager.default.temporaryDirectory
-            let tempFileName = UUID().uuidString + ".jpg"
-            let tempFileURL = tempDirectory.appendingPathComponent(tempFileName)
+            let wallpaperFileURL = try ensureWallpaperFileURL()
 
             let (imageData, _) = try await URLSession.shared.data(from: imageUrl)
-            try imageData.write(to: tempFileURL)
+            try imageData.write(to: wallpaperFileURL, options: [.atomic])
 
-            let screen = NSScreen.main!
+            guard let screen = NSScreen.main else {
+                print("Error: No main screen available.")
+                return
+            }
             var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
 
             switch settings.wallpaperFillMode {
@@ -92,16 +96,37 @@ class WallpaperManager: ObservableObject {
                 options[.allowClipping] = false
             }
 
-            try NSWorkspace.shared.setDesktopImageURL(tempFileURL, for: screen, options: options)
+            try NSWorkspace.shared.setDesktopImageURL(wallpaperFileURL, for: screen, options: options)
             print("Wallpaper updated successfully!")
-
-            // TODO: Implement a more robust temporary file management strategy.
-            // Currently, a new temp file is created for each wallpaper change.
-            // Consider reusing files or cleaning up old ones periodically.
-            try? FileManager.default.removeItem(at: tempFileURL)
 
         } catch {
             print("Error updating wallpaper: \(error.localizedDescription)")
         }
+    }
+
+    private func filterMediaItems(_ items: [MediaItem]) -> [MediaItem] {
+        items.filter { item in
+            if settings.minimumPictureWidth > 0, let width = item.pixelWidth, Double(width) < settings.minimumPictureWidth {
+                return false
+            }
+
+            if settings.horizontalPhotosOnly, let width = item.pixelWidth, let height = item.pixelHeight, width < height {
+                return false
+            }
+
+            return true
+        }
+    }
+
+    private func ensureWallpaperFileURL() throws -> URL {
+        let baseDir = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let appDir = baseDir.appendingPathComponent("GPhotoPaper", isDirectory: true)
+        try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
+        return appDir.appendingPathComponent("wallpaper.jpg")
     }
 }

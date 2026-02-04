@@ -17,6 +17,8 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
-        .environmentObject(SettingsModel()) // Provide a dummy service for preview
+    let settings = SettingsModel()
+    return ContentView()
+        .environmentObject(settings)
+        .environmentObject(WallpaperManager(photosService: DummyOneDrivePhotosService(), settings: settings))
 }

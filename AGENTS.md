@@ -4,7 +4,7 @@ Please follow these guidelines when contributing to this repository:
 
 ## General Guidelines
 
-- This project is a macOS application for switching wallpapers on the Mac using pictures from a Google Photos album
+- This project is a macOS application for switching wallpapers on the Mac using pictures from a OneDrive folder (via Microsoft Graph)
 - The code should use the latest available Swift language and library versions
 - Always consider multiple different aproaches, and choose the best one.
 - Add code comments only for complex or unintuitive code
