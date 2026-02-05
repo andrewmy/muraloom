@@ -26,10 +26,10 @@ class SettingsModel: ObservableObject {
     @Published var horizontalPhotosOnly: Bool { didSet { saveSettings() } }
     @Published var wallpaperFillMode: WallpaperFillMode { didSet { saveSettings() } }
 
-    // OneDrive folder selection (persisted)
-    @Published var selectedFolderId: String? { didSet { saveSettings() } }
-    @Published var selectedFolderName: String? { didSet { saveSettings() } }
-    @Published var selectedFolderWebUrl: URL? { didSet { saveSettings() } }
+    // OneDrive album selection (persisted)
+    @Published var selectedAlbumId: String? { didSet { saveSettings() } }
+    @Published var selectedAlbumName: String? { didSet { saveSettings() } }
+    @Published var selectedAlbumWebUrl: URL? { didSet { saveSettings() } }
     @Published var lastPickedIndex: Int { didSet { saveSettings() } }
     @Published var albumPictureCount: Int = 0
     @Published var showNoPicturesWarning: Bool = false
@@ -41,9 +41,9 @@ class SettingsModel: ObservableObject {
         self.minimumPictureWidth = initialMinimumPictureWidth == 0.0 ? Double(NSScreen.main?.frame.width ?? 1920.0) : initialMinimumPictureWidth
         self.horizontalPhotosOnly = UserDefaults.standard.bool(forKey: "horizontalPhotosOnly")
         self.wallpaperFillMode = UserDefaults.standard.string(forKey: "wallpaperFillMode").flatMap(WallpaperFillMode.init(rawValue:)) ?? .fill
-        self.selectedFolderId = UserDefaults.standard.string(forKey: "selectedFolderId")
-        self.selectedFolderName = UserDefaults.standard.string(forKey: "selectedFolderName")
-        self.selectedFolderWebUrl = UserDefaults.standard.string(forKey: "selectedFolderWebUrl").flatMap(URL.init(string:))
+        self.selectedAlbumId = UserDefaults.standard.string(forKey: "selectedAlbumId")
+        self.selectedAlbumName = UserDefaults.standard.string(forKey: "selectedAlbumName")
+        self.selectedAlbumWebUrl = UserDefaults.standard.string(forKey: "selectedAlbumWebUrl").flatMap(URL.init(string:))
         self.lastPickedIndex = UserDefaults.standard.integer(forKey: "lastPickedIndex")
     }
 
@@ -53,9 +53,9 @@ class SettingsModel: ObservableObject {
         UserDefaults.standard.set(minimumPictureWidth, forKey: "minimumPictureWidth")
         UserDefaults.standard.set(horizontalPhotosOnly, forKey: "horizontalPhotosOnly")
         UserDefaults.standard.set(wallpaperFillMode.rawValue, forKey: "wallpaperFillMode")
-        UserDefaults.standard.set(selectedFolderId, forKey: "selectedFolderId")
-        UserDefaults.standard.set(selectedFolderName, forKey: "selectedFolderName")
-        UserDefaults.standard.set(selectedFolderWebUrl?.absoluteString, forKey: "selectedFolderWebUrl")
+        UserDefaults.standard.set(selectedAlbumId, forKey: "selectedAlbumId")
+        UserDefaults.standard.set(selectedAlbumName, forKey: "selectedAlbumName")
+        UserDefaults.standard.set(selectedAlbumWebUrl?.absoluteString, forKey: "selectedAlbumWebUrl")
         UserDefaults.standard.set(lastPickedIndex, forKey: "lastPickedIndex")
     }
 }

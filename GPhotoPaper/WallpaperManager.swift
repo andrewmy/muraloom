@@ -44,13 +44,13 @@ final class WallpaperManager: ObservableObject {
     }
 
     func updateWallpaper() async {
-        guard let folderId = settings.selectedFolderId, !folderId.isEmpty else {
-            print("Error: No OneDrive folder ID configured.")
+        guard let albumId = settings.selectedAlbumId, !albumId.isEmpty else {
+            print("Error: No OneDrive album selected.")
             return
         }
 
         do {
-            let mediaItems = try await photosService.searchPhotos(in: folderId)
+            let mediaItems = try await photosService.searchPhotos(inAlbumId: albumId)
             let filteredItems = filterMediaItems(mediaItems)
             if filteredItems.isEmpty {
                 print("No photos found after applying filters.")

@@ -2,7 +2,7 @@
 
 GPhotoPaper is a macOS application that automatically changes your desktop wallpaper using photos from OneDrive (via Microsoft Graph).
 
-**Status:** OneDrive sign-in (MSAL) and basic folder-based photo fetching work. The planned next step is selecting OneDrive *albums* (Graph bundles) instead of folders (see `ONEDRIVE_PLAN.md`).
+**Status:** OneDrive sign-in (MSAL) and album-based photo fetching work (Graph bundle albums; see `ONEDRIVE_PLAN.md`).
 
 ## Features
 
@@ -10,8 +10,7 @@ GPhotoPaper is a macOS application that automatically changes your desktop wallp
 *   **Customizable Photo Selection**: Choose between random or sequential photo picking.
 *   **Image Filtering**: Filter photos by minimum width and orientation (horizontal only).
 *   **Wallpaper Fill Mode**: Control how the image fills your desktop (fill, fit, stretch, center).
-*   **OneDrive (Current)**: Authenticate, select a OneDrive folder, and fetch photos via Microsoft Graph.
-*   **Albums (Planned)**: Select a OneDrive album (Graph bundle album) instead of a folder.
+*   **OneDrive**: Authenticate, select a OneDrive album (Graph bundle album), and fetch photos via Microsoft Graph.
 
 ## Getting Started
 
@@ -81,17 +80,43 @@ If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL f
 
 The application should now build and run on your macOS device.
 
-To build via CLI:
+#### Build / Run / Test via CLI
+
+Build (Debug):
 
 ```bash
 xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata build
+```
+
+If you only need a compile sanity check (and want to avoid signing/keychain issues):
+
+```bash
+xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata CODE_SIGNING_ALLOWED=NO build
+```
+
+Run the built app (requires a signed build; `CODE_SIGNING_ALLOWED=NO` won’t produce a runnable app):
+
+```bash
+open /tmp/gphotopaper_deriveddata/Build/Products/Debug/GPhotoPaper.app
+```
+
+Run tests from CLI:
+
+```bash
+xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata test
+```
+
+If UI tests fail to bootstrap in your environment, run only unit tests:
+
+```bash
+xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata test -only-testing:GPhotoPaperTests
 ```
 
 ## Usage
 
 1.  Configure the wallpaper change frequency and selection settings in the app.
 2.  Sign in to OneDrive.
-3.  Load folders and select a folder (or paste a folder ID manually).
+3.  Load albums and select an album (or paste an album ID manually).
 4.  Click "Change Wallpaper Now" to update immediately.
 
 ## Dev Notes

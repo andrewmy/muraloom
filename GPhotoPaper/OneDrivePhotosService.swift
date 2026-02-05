@@ -1,90 +1,84 @@
 import Foundation
 
 enum OneDriveGraphError: Error, LocalizedError {
-    case notSignedIn
     case httpError(status: Int, body: String)
 
     var errorDescription: String? {
         switch self {
-        case .notSignedIn:
-            return "Not signed in."
         case .httpError(let status, _):
             return "Graph HTTP \(status)."
         }
     }
 }
 
+protocol OneDriveAccessTokenProviding {
+    func validAccessToken() async throws -> String
+}
+
+extension OneDriveAuthService: OneDriveAccessTokenProviding {}
+
 final class OneDrivePhotosService: ObservableObject, PhotosService {
-    private let authService: OneDriveAuthService
+    private let authService: any OneDriveAccessTokenProviding
     private let session: URLSession
     private let baseURL = URL(string: "https://graph.microsoft.com/v1.0")!
 
-    init(authService: OneDriveAuthService, session: URLSession = .shared) {
+    init(authService: any OneDriveAccessTokenProviding, session: URLSession = .shared) {
         self.authService = authService
         self.session = session
     }
 
-    func verifyFolderExists(folderId: String) async throws -> OneDriveFolder? {
-        let item: DriveItem = try await get(
-            "/me/drive/items/\(folderId)",
-            query: [
-                .init(name: "$select", value: "id,name,webUrl,folder"),
-            ]
-        )
-        guard item.folder != nil else { return nil }
-        return OneDriveFolder(id: item.id, webUrl: item.webUrl, name: item.name)
-    }
-
-    func listFoldersInRoot() async throws -> [OneDriveFolder] {
-        try await listFolders(childrenOfItemId: nil)
-    }
-
-    func listFolders(childrenOfItemId itemId: String?) async throws -> [OneDriveFolder] {
-        let path: String
-        if let itemId, !itemId.isEmpty {
-            path = "/me/drive/items/\(itemId)/children"
-        } else {
-            path = "/me/drive/root/children"
-        }
-
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+    func listAlbums() async throws -> [OneDriveAlbum] {
+        let path = "/me/drive/bundles"
+        var components = URLComponents(url: graphURL(path), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            .init(name: "$select", value: "id,name,webUrl,folder"),
+            .init(name: "$filter", value: "bundle/album ne null"),
+            .init(name: "$select", value: "id,name,webUrl,bundle"),
         ]
+
         return try await pagedDriveItems(startURL: components.url!) { page in
             page.value
-                .filter { $0.folder != nil }
-                .map { OneDriveFolder(id: $0.id, webUrl: $0.webUrl, name: $0.name) }
+                .filter { $0.bundle?.album != nil }
+                .map { OneDriveAlbum(id: $0.id, webUrl: $0.webUrl, name: $0.name) }
         }
     }
 
-    func searchPhotos(in folderId: String) async throws -> [MediaItem] {
-        let path = "/me/drive/items/\(folderId)/children"
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            .init(name: "$select", value: "id,name,webUrl,file,image,@microsoft.graph.downloadUrl"),
-        ]
+    func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum? {
+        let item: DriveItem = try await get(
+            "/me/drive/items/\(albumId)",
+            query: [
+                .init(name: "$select", value: "id,name,webUrl,bundle"),
+            ]
+        )
+        guard item.bundle?.album != nil else { return nil }
+        return OneDriveAlbum(id: item.id, webUrl: item.webUrl, name: item.name)
+    }
 
-        return try await pagedDriveItems(startURL: components.url!) { page in
-            page.value.compactMap { item in
-                guard let download = item.downloadUrl, let downloadURL = URL(string: download) else {
-                    return nil
-                }
-                if let mime = item.file?.mimeType, mime.hasPrefix("image/") == false, item.image == nil {
-                    return nil
-                }
-                return MediaItem(
-                    id: item.id,
-                    downloadUrl: downloadURL,
-                    pixelWidth: item.image?.width,
-                    pixelHeight: item.image?.height
-                )
+    func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
+        let expandedChildren: DriveItemExpandedChildrenResponse = try await get(
+            "/me/drive/items/\(albumId)",
+            query: [
+                .init(name: "$select", value: "id"),
+                .init(
+                    name: "$expand",
+                    value: "children($select=id,name,webUrl,file,image,@microsoft.graph.downloadUrl)"
+                ),
+            ]
+        )
+
+        var results = Self.mediaItems(from: expandedChildren.children ?? [])
+
+        if let nextLink = expandedChildren.childrenNextLink, let nextURL = URL(string: nextLink) {
+            let additional = try await pagedDriveItems(startURL: nextURL) { page in
+                Self.mediaItems(from: page.value)
             }
+            results.append(contentsOf: additional)
         }
+
+        return results
     }
 
     private func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: graphURL(path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty {
             components.queryItems = query
         }
@@ -105,6 +99,28 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
         }
 
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func graphURL(_ path: String) -> URL {
+        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        return baseURL.appendingPathComponent(trimmed)
+    }
+
+    private static func mediaItems(from driveItems: [DriveItem]) -> [MediaItem] {
+        driveItems.compactMap { item in
+            guard let download = item.downloadUrl, let downloadURL = URL(string: download) else {
+                return nil
+            }
+            if let mime = item.file?.mimeType, mime.hasPrefix("image/") == false, item.image == nil {
+                return nil
+            }
+            return MediaItem(
+                id: item.id,
+                downloadUrl: downloadURL,
+                pixelWidth: item.image?.width,
+                pixelHeight: item.image?.height
+            )
+        }
     }
 
     private func pagedDriveItems<U>(
@@ -148,7 +164,7 @@ private struct DriveItem: Decodable {
     let id: String
     let name: String?
     let webUrl: URL?
-    let folder: FolderFacet?
+    let bundle: BundleFacet?
     let file: FileFacet?
     let image: ImageFacet?
     let downloadUrl: String?
@@ -157,14 +173,18 @@ private struct DriveItem: Decodable {
         case id
         case name
         case webUrl
-        case folder
+        case bundle
         case file
         case image
         case downloadUrl = "@microsoft.graph.downloadUrl"
     }
 }
 
-private struct FolderFacet: Decodable {}
+private struct BundleFacet: Decodable {
+    let album: AlbumFacet?
+}
+
+private struct AlbumFacet: Decodable {}
 
 private struct FileFacet: Decodable {
     let mimeType: String?
@@ -173,4 +193,14 @@ private struct FileFacet: Decodable {
 private struct ImageFacet: Decodable {
     let width: Int?
     let height: Int?
+}
+
+private struct DriveItemExpandedChildrenResponse: Decodable {
+    let children: [DriveItem]?
+    let childrenNextLink: String?
+
+    enum CodingKeys: String, CodingKey {
+        case children
+        case childrenNextLink = "children@odata.nextLink"
+    }
 }

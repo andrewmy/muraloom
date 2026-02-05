@@ -41,14 +41,14 @@ struct GPhotoPaperApp: App {
 }
 
 protocol PhotosService {
-    func searchPhotos(in folderId: String) async throws -> [MediaItem]
-    func verifyFolderExists(folderId: String) async throws -> OneDriveFolder?
+    func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem]
+    func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum?
 }
 
 // Dummy service to keep the app building until OneDrive integration is implemented.
 final class DummyOneDrivePhotosService: PhotosService {
-    func searchPhotos(in folderId: String) async throws -> [MediaItem] { [] }
-    func verifyFolderExists(folderId: String) async throws -> OneDriveFolder? { nil }
+    func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] { [] }
+    func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum? { nil }
 }
 
 // These are placeholders and will be implemented with Microsoft Graph responses later.
@@ -59,7 +59,7 @@ struct MediaItem: Codable, Identifiable {
     var pixelHeight: Int?
 }
 
-struct OneDriveFolder: Codable {
+struct OneDriveAlbum: Codable {
     var id: String
     var webUrl: URL?
     var name: String?

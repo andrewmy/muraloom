@@ -6,9 +6,9 @@ struct SettingsView: View {
     @EnvironmentObject var photosService: OneDrivePhotosService
     @EnvironmentObject var wallpaperManager: WallpaperManager
 
-    @State private var folders: [OneDriveFolder] = []
+    @State private var albums: [OneDriveAlbum] = []
     @State private var isSigningIn: Bool = false
-    @State private var isLoadingFolders: Bool = false
+    @State private var isLoadingAlbums: Bool = false
     @State private var oneDriveError: String?
 
     var body: some View {
@@ -18,10 +18,10 @@ struct SettingsView: View {
                     Text("Signed in.")
                     Button("Sign Out") {
                         authService.signOut()
-                        folders = []
-                        settings.selectedFolderId = nil
-                        settings.selectedFolderName = nil
-                        settings.selectedFolderWebUrl = nil
+                        albums = []
+                        settings.selectedAlbumId = nil
+                        settings.selectedAlbumName = nil
+                        settings.selectedAlbumWebUrl = nil
                     }
                 } else {
                     Button(isSigningIn ? "Signing In…" : "Sign In") {
@@ -48,63 +48,103 @@ struct SettingsView: View {
                 }
             }
 
-            Section(header: Text("OneDrive Folder")) {
+            Section(header: Text("OneDrive Album")) {
                 if authService.isSignedIn {
-                    Button(isLoadingFolders ? "Loading…" : "Load Folders") {
-                        isLoadingFolders = true
+                    Button(isLoadingAlbums ? "Loading…" : "Load Albums") {
+                        isLoadingAlbums = true
                         oneDriveError = nil
                         Task {
                             do {
-                                folders = try await photosService.listFoldersInRoot()
-                                if settings.selectedFolderId == nil, let first = folders.first {
-                                    applySelectedFolder(first)
+                                albums = try await photosService.listAlbums()
+                                if settings.selectedAlbumId == nil, let first = albums.first {
+                                    applySelectedAlbum(first)
                                 }
                             } catch {
                                 oneDriveError = error.localizedDescription
                             }
-                            isLoadingFolders = false
+                            isLoadingAlbums = false
                         }
                     }
-                    .disabled(isLoadingFolders)
+                    .disabled(isLoadingAlbums)
 
-                    if folders.isEmpty {
-                        Text("No folders loaded yet.")
+                    if albums.isEmpty {
+                        Text("No albums loaded yet.")
                             .foregroundStyle(.secondary)
                     } else {
                         Picker(
-                            "Folder",
+                            "Album",
                             selection: Binding(
-                                get: { settings.selectedFolderId ?? "" },
+                                get: { settings.selectedAlbumId ?? "" },
                                 set: { newValue in
-                                    guard let match = folders.first(where: { $0.id == newValue }) else { return }
-                                    applySelectedFolder(match)
+                                    guard let match = albums.first(where: { $0.id == newValue }) else { return }
+                                    applySelectedAlbum(match)
                                 }
                             )
                         ) {
-                            ForEach(folders, id: \.id) { folder in
-                                Text(folder.name ?? folder.id).tag(folder.id)
+                            ForEach(albums, id: \.id) { album in
+                                Text(album.name ?? album.id).tag(album.id)
                             }
                         }
                         .pickerStyle(.menu)
                     }
                 
                     TextField(
-                        "Folder ID (manual)",
+                        "Album ID (manual)",
                         text: Binding(
-                            get: { settings.selectedFolderId ?? "" },
-                            set: { settings.selectedFolderId = $0.isEmpty ? nil : $0 }
+                            get: { settings.selectedAlbumId ?? "" },
+                            set: { settings.selectedAlbumId = $0.isEmpty ? nil : $0 }
                         )
                     )
 
-                    if let name = settings.selectedFolderName, !name.isEmpty {
+                    if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
+                        Button("Validate Album ID") {
+                            oneDriveError = nil
+                            Task {
+                                do {
+                                    if let album = try await photosService.verifyAlbumExists(albumId: albumId) {
+                                        applySelectedAlbum(album)
+                                    } else {
+                                        oneDriveError = "That ID is not an album (bundle album), or it isn’t accessible."
+                                    }
+                                } catch {
+                                    oneDriveError = error.localizedDescription
+                                }
+                            }
+                        }
+                    }
+
+                    if let name = settings.selectedAlbumName, !name.isEmpty {
                         Text("Selected: \(name)")
                     }
 
-                    if let url = settings.selectedFolderWebUrl {
+                    if let url = settings.selectedAlbumWebUrl {
                         Link("Open in OneDrive", destination: url)
                     }
+
+                    if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
+                        Button("Check Album Photos") {
+                            oneDriveError = nil
+                            Task {
+                                do {
+                                    let photos = try await photosService.searchPhotos(inAlbumId: albumId)
+                                    settings.albumPictureCount = photos.count
+                                    settings.showNoPicturesWarning = photos.isEmpty
+                                } catch {
+                                    oneDriveError = error.localizedDescription
+                                }
+                            }
+                        }
+                        if settings.albumPictureCount > 0 {
+                            Text("Photos: \(settings.albumPictureCount)")
+                                .foregroundStyle(.secondary)
+                        }
+                        if settings.showNoPicturesWarning {
+                            Text("This album has no photos.")
+                                .foregroundStyle(.orange)
+                        }
+                    }
                 } else {
-                    Text("Sign in to load and select a folder.")
+                    Text("Sign in to load and select an album.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -147,9 +187,11 @@ struct SettingsView: View {
         }
     }
 
-    private func applySelectedFolder(_ folder: OneDriveFolder) {
-        settings.selectedFolderId = folder.id
-        settings.selectedFolderName = folder.name
-        settings.selectedFolderWebUrl = folder.webUrl
+    private func applySelectedAlbum(_ album: OneDriveAlbum) {
+        settings.selectedAlbumId = album.id
+        settings.selectedAlbumName = album.name
+        settings.selectedAlbumWebUrl = album.webUrl
+        settings.albumPictureCount = 0
+        settings.showNoPicturesWarning = false
     }
 }
