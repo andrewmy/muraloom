@@ -34,25 +34,24 @@ You’ll need to:
 4. Add Microsoft Graph delegated permissions:
    - `User.Read`
    - `Files.Read`
-5. Put your **Application (client) ID** into `OneDriveClientId` in `GPhotoPaper/Info.plist`.
-   - If you leave `OneDriveClientId` as `YOUR_ONEDRIVE_CLIENT_ID`, the app will show “OneDrive auth is not configured”.
+5. Set your **Application (client) ID** (don’t commit secrets):
+   - Copy `GPhotoPaper/Secrets.xcconfig.example` to `GPhotoPaper/Secrets.xcconfig` (gitignored).
+   - Set `ONEDRIVE_CLIENT_ID = ...` in `GPhotoPaper/Secrets.xcconfig`.
    - Where to find it (Microsoft Entra admin center):
      - Go to **Microsoft Entra ID** → **App registrations** → select your app.
      - On the app’s **Overview** page, copy **Application (client) ID**.
      - If the Entra portal warns that new registrations are deprecated, use the Azure portal instead:
        - App registrations (Azure portal): https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
-   - Recommended (don’t commit secrets): copy `GPhotoPaper/Secrets.xcconfig.example` to `GPhotoPaper/Secrets.xcconfig` (gitignored) and set `ONEDRIVE_CLIENT_ID = ...`.
+   - The app reads this via `GPhotoPaper/Config.xcconfig` → `ONEDRIVE_CLIENT_ID` → `OneDriveClientId` in `GPhotoPaper/Info.plist`.
 
 ### Troubleshooting
 
 If clicking “Sign In” shows **“OneDrive auth is not configured”**, it means the app is still using placeholder values.
 
-- Open `GPhotoPaper/Info.plist` and set:
-  - `OneDriveClientId` to your Entra app’s **Application (client) ID**
-  - `OneDriveRedirectUri` to a redirect URI you added to the app registration (must match exactly)
-    - Recommended format for macOS MSAL: `msauth.<bundle_id>://auth` (where `<bundle_id>` is your app’s Bundle Identifier)
-  - `OneDriveScopes` to a space-separated list (e.g. `User.Read Files.Read`)
-    - Note: `openid`, `profile`, and `offline_access` are reserved OIDC scopes. MSAL handles these automatically, so don’t include them here.
+- Ensure `GPhotoPaper/Secrets.xcconfig` exists and contains `ONEDRIVE_CLIENT_ID = ...` (this is used by `GPhotoPaper/Info.plist` via `$(ONEDRIVE_CLIENT_ID)`).
+- Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
+- Verify `OneDriveScopes` is a space-separated list (e.g. `User.Read Files.Read`).
+  - Note: `openid`, `profile`, and `offline_access` are reserved OIDC scopes. MSAL handles these automatically, so don’t include them here.
 
 If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL failed to initialize using the values from `Info.plist`.
 
@@ -73,7 +72,7 @@ If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL f
 4.  Go to the "Signing & Capabilities" tab.
 5.  Change the "Team" to your development team.
 6.  Change the "Bundle Identifier" to a unique identifier (e.g., `com.yourcompany.GPhotoPaper`).
-7.  Ensure the URL scheme in `GPhotoPaper/Info.plist` matches the scheme used by your redirect URI (default scheme: `gphotopaper`).
+7.  Ensure the URL scheme in `GPhotoPaper/Info.plist` matches the scheme used by your redirect URI (default scheme: `msauth.<bundle_id>`).
 
 ### Build and Run
 
@@ -99,6 +98,5 @@ xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /t
 
 This section contains notes for developers working on the project.
 
-*   **TODO List**: Refer to the [`TODO.md`](TODO.md) file for a list of pending tasks and future enhancements.
 *   **OneDrive Roadmap**: Refer to [`ONEDRIVE_PLAN.md`](ONEDRIVE_PLAN.md) for the MSAL + Albums plan.
 *   **Repo Guidance**: Refer to [`AGENTS.md`](AGENTS.md) for contributor/Codex notes.

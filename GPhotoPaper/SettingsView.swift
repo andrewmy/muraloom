@@ -19,6 +19,9 @@ struct SettingsView: View {
                     Button("Sign Out") {
                         authService.signOut()
                         folders = []
+                        settings.selectedFolderId = nil
+                        settings.selectedFolderName = nil
+                        settings.selectedFolderWebUrl = nil
                     }
                 } else {
                     Button(isSigningIn ? "Signing In…" : "Sign In") {
@@ -84,22 +87,25 @@ struct SettingsView: View {
                         }
                         .pickerStyle(.menu)
                     }
-                }
-
-                TextField(
-                    "Folder ID (manual)",
-                    text: Binding(
-                        get: { settings.selectedFolderId ?? "" },
-                        set: { settings.selectedFolderId = $0.isEmpty ? nil : $0 }
+                
+                    TextField(
+                        "Folder ID (manual)",
+                        text: Binding(
+                            get: { settings.selectedFolderId ?? "" },
+                            set: { settings.selectedFolderId = $0.isEmpty ? nil : $0 }
+                        )
                     )
-                )
 
-                if let name = settings.selectedFolderName, !name.isEmpty {
-                    Text("Selected: \(name)")
-                }
+                    if let name = settings.selectedFolderName, !name.isEmpty {
+                        Text("Selected: \(name)")
+                    }
 
-                if let url = settings.selectedFolderWebUrl {
-                    Link("Open in OneDrive", destination: url)
+                    if let url = settings.selectedFolderWebUrl {
+                        Link("Open in OneDrive", destination: url)
+                    }
+                } else {
+                    Text("Sign in to load and select a folder.")
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -139,8 +145,6 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding()
-        .frame(minWidth: 300, maxWidth: .infinity, minHeight: 300, maxHeight: .infinity)
     }
 
     private func applySelectedFolder(_ folder: OneDriveFolder) {

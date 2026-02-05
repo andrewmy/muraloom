@@ -4,8 +4,15 @@ struct ContentView: View {
     @EnvironmentObject var settings: SettingsModel
 
     var body: some View {
-        SettingsView(settings: settings)
-            .frame(minWidth: 520, minHeight: 560)
+        VStack(spacing: 16) {
+            Text("GPhotoPaper")
+                .font(.largeTitle)
+
+            SettingsView(settings: settings)
+                .frame(maxWidth: 520)
+        }
+        .padding(24)
+        .frame(minWidth: 560, idealWidth: 560, minHeight: 520, idealHeight: 520)
     }
 }
 

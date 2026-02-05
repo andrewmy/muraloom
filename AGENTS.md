@@ -19,18 +19,18 @@
 
 ### Current implementation status
 
-- Present today (working): native OAuth (`ASWebAuthenticationSession` + PKCE) + **folder-based** Graph fetching.
+- Present today (working): **MSAL** auth + **folder-based** Graph fetching.
 - Transitional code to expect refactors:
-  - `OneDriveAuthService` will become an MSAL wrapper.
   - `OneDrivePhotosService` will switch from folders to **album bundles** (`/drive/bundles`).
 
 ### Config & scopes (today)
 
-- `Info.plist` keys used by the current native OAuth path:
+- `Info.plist` keys used by the current MSAL path:
   - `OneDriveClientId`, `OneDriveRedirectUri`, `OneDriveScopes`
 - Default read-only scope set for wallpaper fetching:
-  - `User.Read offline_access Files.Read`
+  - `User.Read Files.Read` (MSAL handles reserved OIDC scopes like `openid`, `profile`, `offline_access`)
 - Only add `Files.ReadWrite` if/when implementing album creation or adding/removing items via the app.
+- MSAL token cache entitlement (macOS): ensure `keychain-access-groups` includes `$(AppIdentifierPrefix)com.microsoft.identity.universalstorage` (or you may hit OSStatus `-34018`).
 
 ### Code style
 

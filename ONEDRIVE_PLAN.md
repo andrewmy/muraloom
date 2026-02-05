@@ -48,7 +48,7 @@ Note: Bundle/album APIs are **personal Microsoft account** focused. If we later 
 
 ## Remaining work (phased)
 
-### Phase 1 — Switch auth to MSAL
+### Phase 1 — Switch auth to MSAL (done)
 
 - Add MSAL dependency (SwiftPM).
 - Implement `OneDriveAuthService` as an MSAL wrapper:
@@ -56,9 +56,12 @@ Note: Bundle/album APIs are **personal Microsoft account** focused. If we later 
   - Silent token acquisition for scheduled wallpaper updates
   - Multiple accounts: decide whether to support now or later (MSAL makes this easier).
 - Update configuration:
-  - Replace the current `OneDriveClientId`/redirect scheme placeholders with MSAL-required redirect URI scheme.
-  - Document required Azure app registration settings for a macOS public client.
-- Cleanup:
+  - Redirect URI uses `msauth.<bundle_id>://auth` (Azure portal iOS/macOS platform).
+  - Local dev client id via `GPhotoPaper/Secrets.xcconfig` (gitignored) → `ONEDRIVE_CLIENT_ID` → `OneDriveClientId` in `Info.plist`.
+  - Avoid passing reserved OIDC scopes to MSAL acquire-token calls (`openid`, `profile`, `offline_access`).
+- Keychain entitlement (macOS):
+  - Ensure `keychain-access-groups` includes `$(AppIdentifierPrefix)com.microsoft.identity.universalstorage` (MSAL default cache group), otherwise you may hit OSStatus `-34018`.
+- Cleanup (later):
   - Remove the native `ASWebAuthenticationSession` + PKCE fallback once MSAL is stable.
 
 ### Phase 2 — Albums API (Graph bundles)

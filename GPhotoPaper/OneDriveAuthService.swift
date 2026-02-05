@@ -15,7 +15,7 @@ enum OneDriveAuthError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "OneDrive auth is not configured. Set OneDriveClientId/OneDriveRedirectUri/OneDriveScopes in Info.plist."
+            return "OneDrive auth is not configured. Set ONEDRIVE_CLIENT_ID (via GPhotoPaper/Secrets.xcconfig) and ensure OneDriveRedirectUri/OneDriveScopes are set in Info.plist."
         case .notSignedIn:
             return "Not signed in."
         case .cancelled:
