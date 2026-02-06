@@ -120,8 +120,11 @@ Immediate (MVP) improvements (priority order: reliability → UX/status → sele
   - Next auto change is computed as: `next = lastSuccessfulWallpaperUpdate + interval`.
   - Manual changes update `lastSuccessfulWallpaperUpdate` (so manual resets the schedule), and the UI shows “Last changed” + “Next change”.
 - Graph resilience (MVP): add a small retry/backoff policy for transient errors (429 / 5xx) and handle token failures cleanly.
-- Local file handling (MVP): write wallpapers with correct file type/extension (don’t always write `wallpaper.jpg` if the bytes are PNG/HEIC).
+- Local file handling (MVP): don’t write raw downloaded bytes to `wallpaper.jpg` (file contents may be TIFF/HEIC/etc).
   - Keep atomic writes, and avoid leaving partial files behind if downloads fail.
+  - MVP approach: always set the wallpaper from a real JPEG file on disk (transcode when needed) and downscale to a “recommended” max dimension:
+    - `recommended = max(physical panel pixels, effective “Looks like …” pixels)` across connected displays.
+  - If an item can’t be decoded/transcoded, try a few other photos before surfacing an error.
 - Menu bar (MVP): add a status item for quick control + visibility (even when the window is closed).
   - Minimum actions: Change Now, Pause/Resume, Open Settings, Sign In/Out, Open Selected Album.
   - Minimum status: signed-in state + last update / last error indicator.

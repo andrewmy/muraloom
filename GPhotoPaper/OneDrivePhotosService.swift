@@ -120,6 +120,20 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
     }
 
     func downloadImageData(for item: MediaItem) async throws -> Data {
+        if isRawStillImage(item) {
+            if let thumb = try await downloadLargestThumbnailData(itemId: item.id) {
+                return thumb
+            }
+
+            let ext = item.name.flatMap { ($0 as NSString).pathExtension.lowercased() }
+            let extLabel = (ext?.isEmpty == false) ? ".\(ext!)" : "RAW"
+            throw NSError(
+                domain: "OneDrivePhotosService",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "RAW photos (\(extLabel)) aren’t directly wallpaper-safe. Couldn’t fetch a OneDrive preview thumbnail; export to JPEG/HEIC or wait for OneDrive to generate previews."]
+            )
+        }
+
         if let url = item.downloadUrl {
             let (data, response) = try await session.data(from: url)
             let http = response as? HTTPURLResponse
@@ -137,6 +151,39 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
         let http = response as? HTTPURLResponse
         if let status = http?.statusCode, !(200...299).contains(status) {
             throw OneDriveGraphError.httpError(status: status, body: String(data: data, encoding: .utf8) ?? "")
+        }
+
+        return data
+    }
+
+    private func isRawStillImage(_ item: MediaItem) -> Bool {
+        let name = item.name?.lowercased() ?? ""
+        return name.hasSuffix(".arw")
+            || name.hasSuffix(".cr2")
+            || name.hasSuffix(".nef")
+            || name.hasSuffix(".dng")
+            || name.hasSuffix(".raf")
+            || name.hasSuffix(".orf")
+            || name.hasSuffix(".rw2")
+    }
+
+    private func downloadLargestThumbnailData(itemId: String) async throws -> Data? {
+        let response: ThumbnailsResponse = try await get("/me/drive/items/\(itemId)/thumbnails")
+        guard let first = response.value.first else { return nil }
+
+        let candidates: [Thumbnail] = [first.large, first.medium, first.small].compactMap { $0 }
+        guard let best = candidates.max(by: { a, b in
+            let aArea = (a.width ?? 0) * (a.height ?? 0)
+            let bArea = (b.width ?? 0) * (b.height ?? 0)
+            if aArea != bArea { return aArea < bArea }
+            return (a.url ?? "") < (b.url ?? "")
+        }) else { return nil }
+
+        guard let urlString = best.url, let url = URL(string: urlString) else { return nil }
+
+        let (data, resp) = try await session.data(from: url)
+        if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw OneDriveGraphError.httpError(status: http.statusCode, body: String(data: data, encoding: .utf8) ?? "")
         }
 
         return data
@@ -218,12 +265,16 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
                 || lowercasedName.hasSuffix(".jpeg")
                 || lowercasedName.hasSuffix(".png")
                 || lowercasedName.hasSuffix(".heic")
+                || lowercasedName.hasSuffix(".arw")
+                || lowercasedName.hasSuffix(".dng")
             guard isImage else { return nil }
             return MediaItem(
                 id: item.id,
                 downloadUrl: item.downloadUrl.flatMap(URL.init(string:)),
                 pixelWidth: item.image?.width,
-                pixelHeight: item.image?.height
+                pixelHeight: item.image?.height,
+                name: item.name,
+                mimeType: item.file?.mimeType
             )
         }
     }
@@ -373,6 +424,23 @@ private struct DriveItemListResponse: Decodable {
         case value
         case nextLink = "@odata.nextLink"
     }
+}
+
+private struct ThumbnailsResponse: Decodable {
+    let value: [ThumbnailSet]
+}
+
+private struct ThumbnailSet: Decodable {
+    let id: String?
+    let small: Thumbnail?
+    let medium: Thumbnail?
+    let large: Thumbnail?
+}
+
+private struct Thumbnail: Decodable {
+    let url: String?
+    let width: Int?
+    let height: Int?
 }
 
 private struct DriveItem: Decodable {

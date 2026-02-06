@@ -53,11 +53,7 @@ class SettingsModel: ObservableObject {
     }
 
     private static func recommendedMinimumPictureWidthPixels() -> Double {
-        // Use the effective (“Looks like …”) desktop width, not the HiDPI backing buffer width.
-        // For scaled external displays, macOS can render into a larger offscreen buffer and downsample
-        // to the panel's physical pixels; using the backing size can over-filter.
-        let widths = NSScreen.screens.map { screen in Double(screen.frame.width) }
-        return widths.max() ?? 1920.0
+        Double(WallpaperImageTranscoder.maxRecommendedDisplayPixelWidth())
     }
 
     private func saveSettings() {

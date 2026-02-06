@@ -21,8 +21,7 @@ struct SettingsView: View {
 #endif
 
     private var recommendedMinimumPictureWidthPixels: Double {
-        let widths = NSScreen.screens.map { screen in Double(screen.frame.width) }
-        return widths.max() ?? 1920.0
+        Double(WallpaperImageTranscoder.maxRecommendedDisplayPixelWidth())
     }
 
     var body: some View {
@@ -141,7 +140,7 @@ struct SettingsView: View {
 
                         if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
                             if let count = selectedAlbumUsableCountFirstPage {
-                                Text("Usable photos (first page): \(count)")
+                                Text("Usable photos (first page only): \(count)")
                                     .foregroundStyle(.secondary)
                             } else {
                                 Text("Usable photos (first page): …")
@@ -215,7 +214,7 @@ struct SettingsView: View {
 
                     if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
                         if settings.albumPictureCount > 0 {
-                            Text("Photos: \(settings.albumPictureCount)")
+                            Text("Usable photos (last scan): \(settings.albumPictureCount)")
                                 .foregroundStyle(.secondary)
                         }
                         if settings.showNoPicturesWarning {
@@ -292,8 +291,14 @@ struct SettingsView: View {
                         settings.minimumPictureWidth = recommended
                     }
                     .disabled(Int(settings.minimumPictureWidth.rounded()) == Int(recommended.rounded()))
-                    .help("Sets minimum width to the largest connected display width in the effective (“Looks like …”) resolution (\(Int(recommended))px).")
+                    .help("Sets minimum width to the largest connected display width, choosing the larger of physical panel pixels vs effective (“Looks like …”) width (\(Int(recommended))px).")
                 }
+#if DEBUG
+                let sizing = WallpaperImageTranscoder.debugRecommendedWidths()
+                Text("Recommended calc: logical \(sizing.logicalMax) / physical \(sizing.physicalMax)")
+                    .font(.system(.caption))
+                    .foregroundStyle(.secondary)
+#endif
 
                 Toggle("Only Horizontal Photos", isOn: $settings.horizontalPhotosOnly)
 

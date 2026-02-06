@@ -20,6 +20,7 @@ final class WallpaperManager: ObservableObject {
     private var inFlightUpdateId: UUID?
     private var inFlightUpdateTrigger: WallpaperUpdateTrigger?
     private var lastAttemptDate: Date?
+    private var lastSetItemId: String?
 
     init(photosService: any PhotosService, settings: SettingsModel) {
         self.photosService = photosService
@@ -156,50 +157,107 @@ final class WallpaperManager: ObservableObject {
             if Task.isCancelled { return }
 
             let filteredItems = filterMediaItems(mediaItems)
+            settings.albumPictureCount = filteredItems.count
+            settings.showNoPicturesWarning = filteredItems.isEmpty
             if filteredItems.isEmpty {
                 print("No photos found after applying filters.")
                 return
             }
 
-            let selectedPhoto: MediaItem
-            if settings.pickRandomly {
-                guard let randomItem = filteredItems.randomElement() else { return }
-                selectedPhoto = randomItem
-            } else {
-                // Sequential picking
-                let nextIndex = (settings.lastPickedIndex + 1) % filteredItems.count
-                selectedPhoto = filteredItems[nextIndex]
-                settings.lastPickedIndex = nextIndex
+            let wallpaperDirURL = try ensureWallpaperDirectoryURL()
+            let wallpaperFileURL = wallpaperDirURL.appendingPathComponent("wallpaper-\(UUID().uuidString).jpg")
+            let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
+
+            let maxAttempts = min(3, filteredItems.count)
+            struct Candidate {
+                let item: MediaItem
+                let filteredIndex: Int?
             }
 
-            let wallpaperFileURL = try ensureWallpaperFileURL()
+            let candidates: [Candidate]
+            if settings.pickRandomly {
+                var pool = filteredItems
+                if let lastSetItemId, filteredItems.count > 1 {
+                    let withoutLast = filteredItems.filter { $0.id != lastSetItemId }
+                    if withoutLast.isEmpty == false {
+                        pool = withoutLast
+                    }
+                }
+                candidates = Array(pool.shuffled().prefix(maxAttempts)).map { Candidate(item: $0, filteredIndex: nil) }
+            } else {
+                let startIndex = (settings.lastPickedIndex + 1) % filteredItems.count
+                candidates = (0..<maxAttempts).map { offset in
+                    let idx = (startIndex + offset) % filteredItems.count
+                    return Candidate(item: filteredItems[idx], filteredIndex: idx)
+                }
+            }
 
-            let imageData = try await photosService.downloadImageData(for: selectedPhoto)
-            if Task.isCancelled { return }
-            try imageData.write(to: wallpaperFileURL, options: [.atomic])
+            var conversionErrors: [String] = []
+            var updatedSequentialIndex: Int?
 
-            guard let screen = NSScreen.main else {
-                print("Error: No main screen available.")
+            for (i, candidate) in candidates.enumerated() {
+                if Task.isCancelled { return }
+                do {
+                    if let lastSetItemId, filteredItems.count > 1, candidate.item.id == lastSetItemId {
+                        continue
+                    }
+
+                    let rawData = try await photosService.downloadImageData(for: candidate.item)
+                    if Task.isCancelled { return }
+
+                    let jpegData = try await Task.detached(priority: .utility) {
+                        try WallpaperImageTranscoder.prepareWallpaperJPEG(
+                            from: rawData,
+                            maxDimension: maxDimension,
+                            filenameHint: candidate.item.name
+                        )
+                    }.value
+
+                    if Task.isCancelled { return }
+                    try jpegData.write(to: wallpaperFileURL, options: [.atomic])
+
+                    var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
+
+                    switch settings.wallpaperFillMode {
+                    case .fill:
+                        options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
+                        options[.allowClipping] = true
+                    case .fit:
+                        options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
+                        options[.allowClipping] = false
+                    case .stretch:
+                        options[.imageScaling] = NSImageScaling.scaleAxesIndependently.rawValue
+                        options[.allowClipping] = false
+                    case .center:
+                        options[.imageScaling] = NSImageScaling.scaleNone.rawValue
+                        options[.allowClipping] = false
+                    }
+
+                    try setWallpaperOnAllScreens(wallpaperFileURL, options: options)
+
+                    updatedSequentialIndex = candidate.filteredIndex
+                    lastSetItemId = candidate.item.id
+                    conversionErrors.removeAll()
+                    cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 5)
+                    break
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    try? FileManager.default.removeItem(at: wallpaperFileURL)
+                    conversionErrors.append("#\(i + 1): \(error.localizedDescription)")
+                }
+            }
+
+            guard Task.isCancelled == false else { return }
+            guard conversionErrors.isEmpty else {
+                lastUpdateError = "Couldn’t decode/convert any of the last \(maxAttempts) photos. " + conversionErrors.joined(separator: " ")
                 return
             }
-            var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
 
-            switch settings.wallpaperFillMode {
-            case .fill:
-                options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
-                options[.allowClipping] = true
-            case .fit:
-                options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
-                options[.allowClipping] = false
-            case .stretch:
-                options[.imageScaling] = NSImageScaling.scaleAxesIndependently.rawValue
-                options[.allowClipping] = false
-            case .center:
-                options[.imageScaling] = NSImageScaling.scaleNone.rawValue
-                options[.allowClipping] = false
+            if let updatedSequentialIndex {
+                settings.lastPickedIndex = updatedSequentialIndex
             }
 
-            try NSWorkspace.shared.setDesktopImageURL(wallpaperFileURL, for: screen, options: options)
             print("Wallpaper updated successfully!")
             let now = Date()
             settings.lastSuccessfulWallpaperUpdate = now
@@ -239,5 +297,67 @@ final class WallpaperManager: ObservableObject {
         let appDir = baseDir.appendingPathComponent("GPhotoPaper", isDirectory: true)
         try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
         return appDir.appendingPathComponent("wallpaper.jpg")
+    }
+
+    private func ensureWallpaperDirectoryURL() throws -> URL {
+        let baseDir = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let appDir = baseDir.appendingPathComponent("GPhotoPaper", isDirectory: true)
+        try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
+        return appDir
+    }
+
+    private func setWallpaperOnAllScreens(
+        _ wallpaperFileURL: URL,
+        options: [NSWorkspace.DesktopImageOptionKey: Any]
+    ) throws {
+        let screens = NSScreen.screens
+        guard screens.isEmpty == false else {
+            throw NSError(domain: "WallpaperManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No screens available."])
+        }
+
+        var firstError: Error?
+        for screen in screens {
+            do {
+                try NSWorkspace.shared.setDesktopImageURL(wallpaperFileURL, for: screen, options: options)
+            } catch {
+                if firstError == nil {
+                    firstError = error
+                }
+            }
+        }
+
+        if let firstError {
+            throw firstError
+        }
+    }
+
+    private func cleanupOldWallpaperFiles(in dir: URL, keep: Int) {
+        guard keep > 0 else { return }
+        let fm = FileManager.default
+
+        guard let urls = try? fm.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        let candidates: [(url: URL, date: Date)] = urls.compactMap { url in
+            let name = url.lastPathComponent
+            guard name.hasPrefix("wallpaper-"), name.hasSuffix(".jpg") else { return nil }
+            guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
+                  values.isRegularFile == true
+            else { return nil }
+            return (url, values.contentModificationDate ?? .distantPast)
+        }
+
+        let sorted = candidates.sorted(by: { $0.date > $1.date })
+        for old in sorted.dropFirst(keep) {
+            try? fm.removeItem(at: old.url)
+        }
     }
 }

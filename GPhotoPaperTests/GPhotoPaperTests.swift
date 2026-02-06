@@ -160,7 +160,7 @@ struct GPhotoPaperTests {
         #expect(album?.name == "Album 1")
         #expect(recorder.requests.count == 1)
         #expect(recorder.requests.first?.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
-        #expect(recorder.requests.first?.url?.path.hasSuffix("/me/drive/items/a1") == true)
+        #expect(recorder.requests.first?.url?.path.hasSuffix("/me/drive/bundles/a1") == true)
     }
 
     @Test func searchPhotosInAlbumHandlesExpandedChildrenPaging() async throws {

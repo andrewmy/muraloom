@@ -59,6 +59,8 @@ struct MediaItem: Codable, Identifiable {
     var downloadUrl: URL?
     var pixelWidth: Int?
     var pixelHeight: Int?
+    var name: String?
+    var mimeType: String?
 }
 
 struct OneDriveAlbum: Codable {
