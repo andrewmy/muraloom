@@ -174,7 +174,7 @@ struct GPhotoPaperTests {
                 {
                   "id": "a1",
                   "children": [
-                    { "id": "p1", "file": { "mimeType": "image/jpeg" }, "image": { "width": 1920, "height": 1080 }, "@microsoft.graph.downloadUrl": "https://download.example/p1" },
+                    { "id": "p1", "cTag": "c1", "file": { "mimeType": "image/jpeg" }, "image": { "width": 1920, "height": 1080 }, "@microsoft.graph.downloadUrl": "https://download.example/p1" },
                     { "id": "v1", "file": { "mimeType": "video/mp4" }, "@microsoft.graph.downloadUrl": "https://download.example/v1" }
                   ],
                   "children@odata.nextLink": "\(nextLink)"
@@ -189,7 +189,7 @@ struct GPhotoPaperTests {
                 let json = """
                 {
                   "value": [
-                    { "id": "p2", "image": { "width": 800, "height": 600 }, "@microsoft.graph.downloadUrl": "https://download.example/p2" }
+                    { "id": "p2", "cTag": "c2", "image": { "width": 800, "height": 600 }, "@microsoft.graph.downloadUrl": "https://download.example/p2" }
                   ]
                 }
                 """

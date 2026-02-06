@@ -1,4 +1,5 @@
 import AppKit // For NSWorkspace
+import CryptoKit
 import Foundation
 
 @MainActor
@@ -165,7 +166,6 @@ final class WallpaperManager: ObservableObject {
             }
 
             let wallpaperDirURL = try ensureWallpaperDirectoryURL()
-            let wallpaperFileURL = wallpaperDirURL.appendingPathComponent("wallpaper-\(UUID().uuidString).jpg")
             let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
 
             let maxAttempts = min(3, filteredItems.count)
@@ -200,6 +200,34 @@ final class WallpaperManager: ObservableObject {
                 do {
                     if let lastSetItemId, filteredItems.count > 1, candidate.item.id == lastSetItemId {
                         continue
+                    }
+
+                    let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
+                    if isUsableCachedWallpaperFile(at: wallpaperFileURL) {
+                        var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
+
+                        switch settings.wallpaperFillMode {
+                        case .fill:
+                            options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
+                            options[.allowClipping] = true
+                        case .fit:
+                            options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
+                            options[.allowClipping] = false
+                        case .stretch:
+                            options[.imageScaling] = NSImageScaling.scaleAxesIndependently.rawValue
+                            options[.allowClipping] = false
+                        case .center:
+                            options[.imageScaling] = NSImageScaling.scaleNone.rawValue
+                            options[.allowClipping] = false
+                        }
+
+                        try setWallpaperOnAllScreens(wallpaperFileURL, options: options)
+
+                        updatedSequentialIndex = candidate.filteredIndex
+                        lastSetItemId = candidate.item.id
+                        conversionErrors.removeAll()
+                        cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
+                        break
                     }
 
                     let rawData = try await photosService.downloadImageData(for: candidate.item)
@@ -238,11 +266,12 @@ final class WallpaperManager: ObservableObject {
                     updatedSequentialIndex = candidate.filteredIndex
                     lastSetItemId = candidate.item.id
                     conversionErrors.removeAll()
-                    cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 5)
+                    cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
                     break
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
+                    let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
                     try? FileManager.default.removeItem(at: wallpaperFileURL)
                     conversionErrors.append("#\(i + 1): \(error.localizedDescription)")
                 }
@@ -287,18 +316,6 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-    private func ensureWallpaperFileURL() throws -> URL {
-        let baseDir = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let appDir = baseDir.appendingPathComponent("GPhotoPaper", isDirectory: true)
-        try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
-        return appDir.appendingPathComponent("wallpaper.jpg")
-    }
-
     private func ensureWallpaperDirectoryURL() throws -> URL {
         let baseDir = try FileManager.default.url(
             for: .applicationSupportDirectory,
@@ -309,6 +326,32 @@ final class WallpaperManager: ObservableObject {
         let appDir = baseDir.appendingPathComponent("GPhotoPaper", isDirectory: true)
         try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
         return appDir
+    }
+
+    func clearWallpaperCache() {
+        do {
+            let dir = try ensureWallpaperDirectoryURL()
+            let fm = FileManager.default
+            guard let urls = try? fm.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else { return }
+
+            for url in urls {
+                let name = url.lastPathComponent
+                guard name.hasPrefix("wallpaper-"), name.hasSuffix(".jpg") else { continue }
+                try? fm.removeItem(at: url)
+            }
+
+            // Legacy filename, for older builds.
+            try? fm.removeItem(at: dir.appendingPathComponent("wallpaper.jpg"))
+
+            lastSetItemId = nil
+            lastUpdateError = nil
+        } catch {
+            lastUpdateError = error.localizedDescription
+        }
     }
 
     private func setWallpaperOnAllScreens(
@@ -359,5 +402,27 @@ final class WallpaperManager: ObservableObject {
         for old in sorted.dropFirst(keep) {
             try? fm.removeItem(at: old.url)
         }
+    }
+
+    private func wallpaperCacheFileURL(for item: MediaItem, in dir: URL) -> URL {
+        let cacheKey = wallpaperCacheKey(for: item)
+        return dir.appendingPathComponent("wallpaper-\(cacheKey).jpg")
+    }
+
+    private func wallpaperCacheKey(for item: MediaItem) -> String {
+        let raw = "\(item.id)|\(item.cTag ?? "")"
+        let digest = SHA256.hash(data: Data(raw.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined().prefix(32).lowercased()
+    }
+
+    private func isUsableCachedWallpaperFile(at url: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        if let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+           values.isRegularFile == true,
+           let size = values.fileSize,
+           size > 0 {
+            return true
+        }
+        return false
     }
 }

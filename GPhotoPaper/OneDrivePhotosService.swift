@@ -86,7 +86,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
                 .init(name: "$select", value: "id"),
                 .init(
                     name: "$expand",
-                    value: "children($select=id,name,webUrl,file,image,photo)"
+                    value: "children($select=id,name,webUrl,file,image,photo,cTag)"
                 ),
             ]
         )
@@ -112,7 +112,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
                     name: "$expand",
                     // Note: for DriveItem children, Graph only supports $select/$expand inside $expand options.
                     // $top in expand options yields a 400 (invalidRequest).
-                    value: "children($select=id,name,file,image,photo)"
+                    value: "children($select=id,name,file,image,photo,cTag)"
                 ),
             ]
         )
@@ -274,7 +274,8 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
                 pixelWidth: item.image?.width,
                 pixelHeight: item.image?.height,
                 name: item.name,
-                mimeType: item.file?.mimeType
+                mimeType: item.file?.mimeType,
+                cTag: item.cTag
             )
         }
     }
@@ -447,6 +448,7 @@ private struct DriveItem: Decodable {
     let id: String
     let name: String?
     let webUrl: URL?
+    let cTag: String?
     let bundle: BundleFacet?
     let folder: FolderFacet?
     let file: FileFacet?
@@ -458,6 +460,7 @@ private struct DriveItem: Decodable {
         case id
         case name
         case webUrl
+        case cTag
         case bundle
         case folder
         case file

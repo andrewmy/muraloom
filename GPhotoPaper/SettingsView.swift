@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var didValidateStoredSelection: Bool = false
     @State private var didAutoLoadAlbums: Bool = false
     @State private var showAdvancedAlbumControls: Bool = false
+    @State private var showAdvancedWallpaperControls: Bool = false
     @State private var selectedAlbumUsableCountFirstPage: Int?
     @State private var oneDriveError: String?
 #if DEBUG
@@ -308,6 +309,33 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
+
+                Button {
+                    showAdvancedWallpaperControls.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: showAdvancedWallpaperControls ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Advanced")
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if showAdvancedWallpaperControls {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button("Clear Wallpaper Cache") {
+                            wallpaperManager.clearWallpaperCache()
+                        }
+                        Text("Removes cached wallpaper JPEGs (including OneDrive RAW previews) so the next change re-downloads as needed.")
+                            .font(.system(.caption))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.leading, 18)
+                }
             }
 
             Section {
