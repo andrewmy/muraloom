@@ -13,8 +13,7 @@ struct SettingsView: View {
     @State private var didAttemptLoadAlbums: Bool = false
     @State private var didValidateStoredSelection: Bool = false
     @State private var didAutoLoadAlbums: Bool = false
-    @State private var showAdvancedAlbumControls: Bool = false
-    @State private var showAdvancedWallpaperControls: Bool = false
+    @State private var showAdvancedControls: Bool = false
     @State private var selectedAlbumUsableCountFirstPage: Int?
     @State private var oneDriveError: String?
 #if DEBUG
@@ -105,21 +104,6 @@ struct SettingsView: View {
                         if didAttemptLoadAlbums {
                             Text("Create/manage albums in OneDrive Photos, then reload here.")
                                 .foregroundStyle(.secondary)
-#if DEBUG
-                            Button("Debug: Probe Albums") {
-                                oneDriveDebugInfo = nil
-                                Task {
-                                    oneDriveDebugInfo = await photosService.debugProbeAlbumListing()
-                                }
-                            }
-                            if let oneDriveDebugInfo, !oneDriveDebugInfo.isEmpty {
-                                Text(oneDriveDebugInfo)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .lineLimit(nil)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-#endif
                         }
                     } else {
                         Picker(
@@ -148,65 +132,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                    }
-
-                    Button {
-                        showAdvancedAlbumControls.toggle()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: showAdvancedAlbumControls ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                            Text("Advanced")
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if showAdvancedAlbumControls {
-                        VStack(alignment: .leading, spacing: 8) {
-                        TextField(
-                            "Album ID (manual)",
-                            text: Binding(
-                                get: { settings.selectedAlbumId ?? "" },
-                                set: { settings.selectedAlbumId = $0.isEmpty ? nil : $0 }
-                            )
-                        )
-
-                        if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
-                            Button("Validate Album ID") {
-                                oneDriveError = nil
-                                Task {
-                                    do {
-                                        if let album = try await photosService.verifyAlbumExists(albumId: albumId) {
-                                            applySelectedAlbum(album)
-                                        } else {
-                                            oneDriveError = "That ID could not be verified as an accessible OneDrive album."
-                                        }
-                                    } catch {
-                                        oneDriveError = error.localizedDescription
-                                    }
-                                }
-                            }
-                        }
-
-                        if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
-                            Button("Check Album Photos (full scan)") {
-                                oneDriveError = nil
-                                Task {
-                                    do {
-                                        let photos = try await photosService.searchPhotos(inAlbumId: albumId)
-                                        settings.albumPictureCount = photos.count
-                                        settings.showNoPicturesWarning = photos.isEmpty
-                                    } catch {
-                                        oneDriveError = error.localizedDescription
-                                    }
-                                }
-                            }
-                        }
-                        }
-                        .padding(.leading, 18)
                     }
 
                     if let url = settings.selectedAlbumWebUrl {
@@ -309,30 +234,115 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
+            }
 
+            Section(header: Text("Advanced")) {
                 Button {
-                    showAdvancedWallpaperControls.toggle()
+                    showAdvancedControls.toggle()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: showAdvancedWallpaperControls ? "chevron.down" : "chevron.right")
+                        Image(systemName: showAdvancedControls ? "chevron.down" : "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        Text("Advanced")
+                        Text("Show Advanced Controls")
                         Spacer()
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
-                if showAdvancedWallpaperControls {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Button("Clear Wallpaper Cache") {
-                            wallpaperManager.clearWallpaperCache()
+                if showAdvancedControls {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Group {
+                            Text("Album")
+                                .font(.system(.subheadline, weight: .semibold))
+
+                            if authService.isSignedIn {
+                                TextField(
+                                    "Album ID (manual)",
+                                    text: Binding(
+                                        get: { settings.selectedAlbumId ?? "" },
+                                        set: { settings.selectedAlbumId = $0.isEmpty ? nil : $0 }
+                                    )
+                                )
+
+                                if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
+                                    Button("Validate Album ID") {
+                                        oneDriveError = nil
+                                        Task {
+                                            do {
+                                                if let album = try await photosService.verifyAlbumExists(albumId: albumId) {
+                                                    applySelectedAlbum(album)
+                                                } else {
+                                                    oneDriveError = "That ID could not be verified as an accessible OneDrive album."
+                                                }
+                                            } catch {
+                                                oneDriveError = error.localizedDescription
+                                            }
+                                        }
+                                    }
+
+                                    Button("Check Album Photos (full scan)") {
+                                        oneDriveError = nil
+                                        Task {
+                                            do {
+                                                let photos = try await photosService.searchPhotos(inAlbumId: albumId)
+                                                settings.albumPictureCount = photos.count
+                                                settings.showNoPicturesWarning = photos.isEmpty
+                                            } catch {
+                                                oneDriveError = error.localizedDescription
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text("Sign in to use advanced album tools.")
+                                    .font(.system(.caption))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                        Text("Removes cached wallpaper JPEGs (including OneDrive RAW previews) so the next change re-downloads as needed.")
-                            .font(.system(.caption))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+
+                        Divider()
+
+                        Group {
+                            Text("Wallpaper")
+                                .font(.system(.subheadline, weight: .semibold))
+
+                            Button("Clear Wallpaper Cache") {
+                                wallpaperManager.clearWallpaperCache()
+                            }
+
+                            Text("Removes cached wallpaper JPEGs (including OneDrive RAW previews) so the next change re-downloads as needed.")
+                                .font(.system(.caption))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+#if DEBUG
+                        if authService.isSignedIn, didAttemptLoadAlbums {
+                            Divider()
+
+                            Group {
+                                Text("Debug")
+                                    .font(.system(.subheadline, weight: .semibold))
+
+                                Button("Probe Albums") {
+                                    oneDriveDebugInfo = nil
+                                    Task {
+                                        oneDriveDebugInfo = await photosService.debugProbeAlbumListing()
+                                    }
+                                }
+
+                                if let oneDriveDebugInfo, !oneDriveDebugInfo.isEmpty {
+                                    Text(oneDriveDebugInfo)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .textSelection(.enabled)
+                                        .lineLimit(nil)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+#endif
                     }
                     .padding(.leading, 18)
                 }
