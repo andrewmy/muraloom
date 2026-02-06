@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Sanity build (no signing)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -scheme GPhotoPaper \
+            -destination 'platform=macOS' \
+            -derivedDataPath /tmp/gphotopaper_deriveddata \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Unit tests (no UI tests, no signing)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -scheme GPhotoPaper \
+            -destination 'platform=macOS' \
+            -derivedDataPath /tmp/gphotopaper_deriveddata \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            test \
+            -only-testing:GPhotoPaperTests
