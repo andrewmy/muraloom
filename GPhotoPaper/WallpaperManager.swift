@@ -365,6 +365,7 @@ final class WallpaperManager: ObservableObject {
             settings.lastSuccessfulWallpaperUpdate = now
             lastSuccessfulUpdate = now
             lastUpdateError = nil
+            settings.flushToDisk()
             let finalName = settings.lastSetWallpaperItemName?.trimmingCharacters(in: .whitespacesAndNewlines)
             updateStage = .done(name: (finalName?.isEmpty == false) ? finalName! : (settings.lastSetWallpaperItemId ?? ""))
 

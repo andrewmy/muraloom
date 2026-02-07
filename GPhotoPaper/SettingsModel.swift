@@ -78,4 +78,11 @@ class SettingsModel: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "lastSuccessfulWallpaperUpdate")
         }
     }
+
+    /// Forces settings to be flushed to disk. Useful right after a wallpaper change so the
+    /// current filename/id persist even if the user quits immediately.
+    @MainActor
+    func flushToDisk() {
+        CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
+    }
 }
