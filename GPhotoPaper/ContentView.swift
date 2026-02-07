@@ -2,17 +2,22 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var settings: SettingsModel
+    @State private var showAdvancedControls: Bool = false
+
+    private let windowWidth: CGFloat = 560
 
     var body: some View {
         VStack(spacing: 16) {
             Text("GPhotoPaper")
                 .font(.largeTitle)
 
-            SettingsView(settings: settings)
+            SettingsView(settings: settings, showAdvancedControls: $showAdvancedControls)
                 .frame(maxWidth: 520)
         }
         .padding(24)
-        .frame(minWidth: 560, idealWidth: 560, minHeight: 520, idealHeight: 520)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: windowWidth, alignment: .top)
+        .animation(.snappy, value: showAdvancedControls)
     }
 }
 

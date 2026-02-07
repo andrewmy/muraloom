@@ -37,6 +37,7 @@ struct GPhotoPaperApp: App {
                     wallpaperManager.startWallpaperUpdates()
                 }
         }
+        .windowResizability(.contentSize)
     }
 }
 

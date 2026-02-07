@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: SettingsModel
+    @Binding var showAdvancedControls: Bool
     @EnvironmentObject var authService: OneDriveAuthService
     @EnvironmentObject var photosService: OneDrivePhotosService
     @EnvironmentObject var wallpaperManager: WallpaperManager
@@ -16,7 +17,6 @@ struct SettingsView: View {
     @State private var didAttemptLoadAlbums: Bool = false
     @State private var didValidateStoredSelection: Bool = false
     @State private var didAutoLoadAlbums: Bool = false
-    @State private var showAdvancedControls: Bool = false
     @State private var selectedAlbumUsableCountFirstPage: Int?
     @State private var oneDriveError: String?
 #if DEBUG
