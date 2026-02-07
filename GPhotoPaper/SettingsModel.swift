@@ -32,6 +32,7 @@ class SettingsModel: ObservableObject {
     @Published var selectedAlbumWebUrl: URL? { didSet { saveSettings() } }
     @Published var lastPickedIndex: Int { didSet { saveSettings() } }
     @Published var lastSuccessfulWallpaperUpdate: Date? { didSet { saveSettings() } }
+    @Published var lastSetWallpaperItemId: String? { didSet { saveSettings() } }
     @Published var albumPictureCount: Int = 0
     @Published var showNoPicturesWarning: Bool = false
 
@@ -50,6 +51,7 @@ class SettingsModel: ObservableObject {
         self.lastPickedIndex = UserDefaults.standard.integer(forKey: "lastPickedIndex")
         let lastUpdateTimestamp = UserDefaults.standard.double(forKey: "lastSuccessfulWallpaperUpdate")
         self.lastSuccessfulWallpaperUpdate = lastUpdateTimestamp > 0 ? Date(timeIntervalSince1970: lastUpdateTimestamp) : nil
+        self.lastSetWallpaperItemId = UserDefaults.standard.string(forKey: "lastSetWallpaperItemId")
     }
 
     private static func recommendedMinimumPictureWidthPixels() -> Double {
@@ -66,6 +68,7 @@ class SettingsModel: ObservableObject {
         UserDefaults.standard.set(selectedAlbumName, forKey: "selectedAlbumName")
         UserDefaults.standard.set(selectedAlbumWebUrl?.absoluteString, forKey: "selectedAlbumWebUrl")
         UserDefaults.standard.set(lastPickedIndex, forKey: "lastPickedIndex")
+        UserDefaults.standard.set(lastSetWallpaperItemId, forKey: "lastSetWallpaperItemId")
         if let lastSuccessfulWallpaperUpdate {
             UserDefaults.standard.set(lastSuccessfulWallpaperUpdate.timeIntervalSince1970, forKey: "lastSuccessfulWallpaperUpdate")
         } else {

@@ -68,7 +68,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section(header: Text("OneDrive Album").help("Usable photos are image items (image/* files or items with image/photo metadata). Videos are ignored. The quick check scans only the first page.")) {
+            Section(header: Text("OneDrive Album").help("Usable photos are image items (image/* files or items with image/photo metadata). Videos are ignored. RAW photos (ARW/DNG/etc) are included only when LibRaw support is enabled. The quick check scans only the first page.")) {
                 if authService.isSignedIn {
                     Text("Usable photos are image items (image/* files or items with image/photo metadata). Videos are ignored. The quick check scans only the first page.")
                         .font(.system(.caption))
@@ -120,8 +120,8 @@ struct SettingsView: View {
                                 Text(album.name ?? album.id).tag(album.id)
                             }
                         }
-                        .pickerStyle(.menu)
-                        .help("Photos are considered usable if they’re image items (image/* or with image/photo metadata). The app ignores videos.")
+                            .pickerStyle(.menu)
+                        .help("Photos are considered usable if they’re image items (image/* or with image/photo metadata). The app ignores videos. RAW formats require LibRaw support.")
 
                         if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
                             if let count = selectedAlbumUsableCountFirstPage {
@@ -312,7 +312,7 @@ struct SettingsView: View {
                                 wallpaperManager.clearWallpaperCache()
                             }
 
-                            Text("Removes cached wallpaper JPEGs (including OneDrive RAW previews) so the next change re-downloads as needed.")
+                            Text("Removes cached wallpaper JPEGs (including RAW conversions) so the next change re-downloads as needed.")
                                 .font(.system(.caption))
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -349,8 +349,19 @@ struct SettingsView: View {
             }
 
             Section {
-                Button("Change Wallpaper Now") {
+                Button(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now") {
                     wallpaperManager.requestWallpaperUpdate(trigger: .manual)
+                }
+                .disabled(wallpaperManager.isUpdating)
+
+                if wallpaperManager.isUpdating {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Changing wallpaper…")
+                            .font(.system(.caption))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

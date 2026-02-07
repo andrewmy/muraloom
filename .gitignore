@@ -114,6 +114,10 @@
 
 # Local secrets
 GPhotoPaper/Secrets.xcconfig
+
+# Local optional LibRaw config (RAW decoding)
+GPhotoPaper/LibRaw.xcconfig
+LibRaw.xcconfig
 /GPhotoPaper.framework
 /GPhotoPaper.framework.dSYM
 /GPhotoPaper.framework.dSYM.zip

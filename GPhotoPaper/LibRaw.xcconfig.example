@@ -1,0 +1,18 @@
+// Optional local build settings to enable LibRaw-based RAW decoding (ARW/DNG/etc).
+//
+// Usage:
+// 1) Copy this file to `GPhotoPaper/LibRaw.xcconfig` (gitignored), then tweak paths/flags.
+// 2) Ensure `GPhotoPaper/Config.xcconfig` includes it via `#include?`.
+//
+// Notes:
+// - Prefer linking LibRaw statically (or via an XCFramework) for the least hassle with signing/notarization.
+// - For local dev, a Homebrew install can work by pointing search paths at /opt/homebrew or /usr/local.
+
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) LIBRAW_ENABLED=1
+
+HEADER_SEARCH_PATHS = $(inherited) $(LIBRAW_PREFIX)/include
+LIBRARY_SEARCH_PATHS = $(inherited) $(LIBRAW_PREFIX)/lib
+
+// If your install provides `libraw_r` instead, use `-lraw_r`.
+OTHER_LDFLAGS = $(inherited) -lraw
+

@@ -9,6 +9,7 @@ GPhotoPaper is a macOS app that automatically changes your desktop wallpaper usi
 *   **Image Filtering**: Filter photos by minimum width and orientation (horizontal only).
 *   **Wallpaper Fill Mode**: Control how the image fills your desktop (fill, fit, stretch, center).
 *   **OneDrive Album Picker**: Sign in and pick a OneDrive album (advanced: manual album ID).
+*   **RAW Photos (optional)**: ARW/DNG/etc are supported when LibRaw is enabled (see `docs/LIBRAW.md`).
 
 ## Getting Started
 

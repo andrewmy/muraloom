@@ -27,6 +27,49 @@ enum WallpaperImageTranscoderError: Error, LocalizedError {
 }
 
 enum WallpaperImageTranscoder {
+    private static let rawExtensions: Set<String> = [
+        "arw", "dng", "cr2", "nef", "raf", "orf", "rw2",
+    ]
+
+    static var supportsRawDecoding: Bool {
+        LibRawDecoder.isAvailable()
+    }
+
+    private actor TranscodeActor {
+        func transcode(
+            _ data: Data,
+            maxDimension: Int,
+            filenameHint: String?,
+            quality: Double
+        ) throws -> Data {
+            try Task.checkCancellation()
+            let result = try WallpaperImageTranscoder.prepareWallpaperJPEG(
+                from: data,
+                maxDimension: maxDimension,
+                filenameHint: filenameHint,
+                quality: quality
+            )
+            try Task.checkCancellation()
+            return result
+        }
+    }
+
+    private static let transcodeActor = TranscodeActor()
+
+    static func prepareWallpaperJPEGAsync(
+        from data: Data,
+        maxDimension: Int,
+        filenameHint: String? = nil,
+        quality: Double = 0.9
+    ) async throws -> Data {
+        try await transcodeActor.transcode(
+            data,
+            maxDimension: max(1, maxDimension),
+            filenameHint: filenameHint,
+            quality: quality
+        )
+    }
+
     private struct DisplayModeInfo: Sendable {
         let width: Int
         let height: Int
@@ -258,17 +301,42 @@ enum WallpaperImageTranscoder {
         filenameHint: String? = nil,
         quality: Double = 0.9
     ) throws -> Data {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            throw WallpaperImageTranscoderError.invalidImageData
-        }
-
-        let sourceType = (CGImageSourceGetType(source) as String?).flatMap(UTType.init)
         let extHint: String? = filenameHint.flatMap { name -> String? in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard trimmed.isEmpty == false else { return nil }
             let ext = (trimmed as NSString).pathExtension
             return ext.isEmpty ? nil : ext.lowercased()
         }
+
+        if let extHint, rawExtensions.contains(extHint) {
+            guard LibRawDecoder.isAvailable() else {
+                throw NSError(
+                    domain: "WallpaperImageTranscoder",
+                    code: 100,
+                    userInfo: [NSLocalizedDescriptionKey: "RAW photos aren’t supported in this build (type: \(extHint))."]
+                )
+            }
+
+            do {
+                return try LibRawDecoder.decodeRAW(
+                    toJPEGData: data,
+                    maxDimension: max(1, maxDimension),
+                    quality: quality
+                )
+            } catch {
+                throw NSError(
+                    domain: "WallpaperImageTranscoder",
+                    code: 101,
+                    userInfo: [NSLocalizedDescriptionKey: "\(error.localizedDescription) (type: \(extHint))."]
+                )
+            }
+        }
+
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            throw WallpaperImageTranscoderError.invalidImageData
+        }
+
+        let sourceType = (CGImageSourceGetType(source) as String?).flatMap(UTType.init)
         let typeLabel = extHint ?? sourceType?.preferredFilenameExtension ?? sourceType?.identifier ?? "unknown"
 
         let imageCount = max(1, CGImageSourceGetCount(source))

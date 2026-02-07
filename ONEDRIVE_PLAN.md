@@ -125,6 +125,7 @@ Immediate (MVP) improvements (priority order: reliability → UX/status → sele
   - MVP approach: always set the wallpaper from a real JPEG file on disk (transcode when needed) and downscale to a “recommended” max dimension:
     - `recommended = max(physical panel pixels, effective “Looks like …” pixels)` across connected displays.
   - If an item can’t be decoded/transcoded, try a few other photos before surfacing an error.
+  - RAW photos (ARW/DNG/etc): require a dedicated decoder (LibRaw). If LibRaw is enabled, decode RAW → JPEG; otherwise exclude RAW items from “usable photos” (see `docs/LIBRAW.md`).
 - Menu bar (MVP): add a status item for quick control + visibility (even when the window is closed).
   - Minimum actions: Change Now, Pause/Resume, Open Settings, Sign In/Out, Open Selected Album.
   - Minimum status: signed-in state + last update / last error indicator.
