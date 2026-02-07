@@ -50,6 +50,13 @@ If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL f
 - If you changed bundle ID / redirect settings recently, try **Product → Clean Build Folder** in Xcode and run again.
 - If the underlying error is **OSStatus -34018**, it usually means the app is missing a required Keychain entitlement. Ensure the `GPhotoPaper` target’s entitlements include MSAL’s default macOS cache group (`$(AppIdentifierPrefix)com.microsoft.identity.universalstorage`) and that the app is run as a signed build from Xcode.
 
+If you downloaded `GPhotoPaper.app` and macOS refuses to open it, remove the quarantine attribute and try again:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/GPhotoPaper.app
+open /path/to/GPhotoPaper.app
+```
+
 ### Xcode Setup
 
 1.  Clone this repository:
