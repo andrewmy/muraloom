@@ -16,6 +16,20 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
+      - name: Install LibRaw (Homebrew)
+        run: |
+          set -euo pipefail
+          brew install libraw
+          LIBRAW_PREFIX="$(brew --prefix libraw)"
+          cat > LibRaw.xcconfig <<EOF
+          // Auto-generated in CI (gitignored) to enable RAW decoding via LibRaw.
+          LIBRAW_PREFIX = ${LIBRAW_PREFIX}
+          GCC_PREPROCESSOR_DEFINITIONS = \$(inherited) LIBRAW_ENABLED=1
+          HEADER_SEARCH_PATHS = \$(inherited) \$(LIBRAW_PREFIX)/include
+          LIBRARY_SEARCH_PATHS = \$(inherited) \$(LIBRAW_PREFIX)/lib
+          OTHER_LDFLAGS = \$(inherited) -lraw
+          EOF
+
       - name: Sanity build (no signing)
         run: |
           set -euo pipefail
