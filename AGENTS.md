@@ -12,10 +12,25 @@
 
 - CLI build:
   - `xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata build`
+- Unit tests (local):
+  - `just test`
+- Coverage gate (local, same as CI):
+  - `just coverage` (or `just coverage-report` for a report without enforcing a minimum).
+- UI tests (local, hermetic):
+  - `just ui-test`
 - If CLI builds fail with signing/keychain errors but Xcode builds work:
   - Ensure Xcode is signed into your Apple ID and the target has a Team + “Automatically manage signing”.
   - Some sandboxed/automation environments may need elevated permissions to access signing certificates.
   - For a “compile-only” sanity check in CI, you can use `CODE_SIGNING_ALLOWED=NO` (won’t produce a runnable signed app).
+
+### UI tests (hermetic / non-flaky)
+
+- UI tests run the app in a fixture mode (no interactive MSAL sign-in, no Microsoft Graph calls) by launching with `-ui-testing` + `GPHOTOPAPER_UI_TESTING=1`.
+- Configure fixture behavior via `GPHOTOPAPER_UI_TEST_PHOTOS_MODE` (e.g. `listAlbumsFailOnce` to simulate a reload error that recovers on retry).
+- Prefer in-app harnesses over system UI automation when needed:
+  - Menu bar actions are exercised via an in-window “Menu Bar (UI testing)” harness shown under Advanced in UI testing mode (system status bar UI is flaky/unreliable in XCUITest).
+- Avoid tests that change global macOS state (e.g. appearance/theme). Xcode can prompt to run UI tests under multiple UI configurations; that can leave the system in Dark/Light if interrupted.
+- Expect Xcode UI tests to sometimes prompt “Remove Other Apps” (it’s Xcode/XCUITest trying to improve reliability by closing other apps).
 
 ### Current implementation status
 
@@ -43,6 +58,7 @@
 ### Code style
 
 - Keep services behind protocols where it helps testability (`PhotosService`).
+- Avoid sprinkling `AppEnvironment.isUITesting` across the codebase; keep UI-test branching in the composition root and inject fixture implementations instead.
 - Prefer concise errors and minimal UI state in views.
 - When making behavioral changes, **add or update unit tests** to cover them whenever practical.
 

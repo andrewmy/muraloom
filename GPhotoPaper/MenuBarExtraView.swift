@@ -3,7 +3,7 @@ import SwiftUI
 
 struct MenuBarLabelView: View {
     @EnvironmentObject private var settings: SettingsModel
-    @EnvironmentObject private var authService: OneDriveAuthService
+    @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var wallpaperManager: WallpaperManager
 
     private var symbolName: String {
@@ -22,12 +22,13 @@ struct MenuBarLabelView: View {
     var body: some View {
         Image(systemName: symbolName)
             .accessibilityLabel("GPhotoPaper")
+            .accessibilityIdentifier("menubar.statusItem")
     }
 }
 
 struct MenuBarMenuView: View {
     @EnvironmentObject private var settings: SettingsModel
-    @EnvironmentObject private var authService: OneDriveAuthService
+    @EnvironmentObject private var authService: AuthService
     @EnvironmentObject private var wallpaperManager: WallpaperManager
     @Environment(\.openWindow) private var openWindow
 
@@ -172,6 +173,7 @@ struct MenuBarMenuView: View {
                 Label(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now", systemImage: "sparkles")
             }
             .disabled(wallpaperManager.isUpdating || authService.isSignedIn == false || hasSelectedAlbum == false)
+            .accessibilityIdentifier("menubar.changeNow")
 
             if settings.isPaused {
                 Button {
@@ -180,6 +182,7 @@ struct MenuBarMenuView: View {
                 } label: {
                     Label("Resume Automatic Changes", systemImage: "play.fill")
                 }
+                .accessibilityIdentifier("menubar.pauseResume")
             } else {
                 Button {
                     settings.isPaused = true
@@ -187,6 +190,7 @@ struct MenuBarMenuView: View {
                 } label: {
                     Label("Pause Automatic Changes", systemImage: "pause.fill")
                 }
+                .accessibilityIdentifier("menubar.pauseResume")
             }
 
             Divider()
@@ -196,6 +200,7 @@ struct MenuBarMenuView: View {
             } label: {
                 Label("Open Settings…", systemImage: "gearshape")
             }
+            .accessibilityIdentifier("menubar.openSettings")
 
             if let url = settings.selectedAlbumWebUrl {
                 Button {
@@ -203,6 +208,7 @@ struct MenuBarMenuView: View {
                 } label: {
                     Label("Open Selected Album", systemImage: "photo.on.rectangle.angled")
                 }
+                .accessibilityIdentifier("menubar.openAlbum")
             }
 
             Divider()
@@ -213,6 +219,7 @@ struct MenuBarMenuView: View {
                 } label: {
                     Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                 }
+                .accessibilityIdentifier("menubar.signOut")
             } else {
                 Button {
                     beginSignIn()
@@ -220,6 +227,7 @@ struct MenuBarMenuView: View {
                     Label(isSigningIn ? "Signing In…" : "Sign In…", systemImage: "person.crop.circle.badge.plus")
                 }
                 .disabled(isSigningIn)
+                .accessibilityIdentifier("menubar.signIn")
             }
 
             Divider()
@@ -229,6 +237,7 @@ struct MenuBarMenuView: View {
             } label: {
                 Label("Quit GPhotoPaper", systemImage: "power")
             }
+            .accessibilityIdentifier("menubar.quit")
         }
         .task(id: authService.isSignedIn) {
             if authService.isSignedIn {

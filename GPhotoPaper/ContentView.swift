@@ -10,6 +10,7 @@ struct ContentView: View {
         VStack(spacing: 16) {
             Text("GPhotoPaper")
                 .font(.largeTitle)
+                .accessibilityIdentifier("app.title")
 
             SettingsView(settings: settings, showAdvancedControls: $showAdvancedControls)
                 .frame(maxWidth: 520)
@@ -27,7 +28,8 @@ struct ContentView: View {
     let photosService = OneDrivePhotosService(authService: authService)
     return ContentView()
         .environmentObject(settings)
-        .environmentObject(authService)
-        .environmentObject(photosService)
+        .environmentObject(authService as AuthService)
+        .environmentObject(photosService as PhotosServiceModel)
         .environmentObject(WallpaperManager(photosService: DummyOneDrivePhotosService(), settings: settings))
+        .environmentObject(AppTesting(isUITesting: false))
 }

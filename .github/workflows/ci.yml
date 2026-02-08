@@ -8,6 +8,8 @@ on:
 env:
   # Keep these in one place so we can bump the supported macOS baseline easily.
   TARGET_MACOS_VERSION: "15.5"
+  # Keep this conservative; raise over time as tests improve.
+  MIN_UNIT_TEST_COVERAGE_PERCENT: "50"
 
 jobs:
   build-and-test:
@@ -111,18 +113,50 @@ jobs:
             echo "No bundled dylibs found; skipping minos check"
           fi
 
-      - name: Unit tests (no UI tests, no signing)
+      - name: Unit tests + coverage (no UI tests, no signing)
         run: |
           set -euo pipefail
           xcodebuild \
             -scheme GPhotoPaper \
             -destination 'platform=macOS' \
             -derivedDataPath /tmp/gphotopaper_deriveddata_test \
+            -resultBundlePath /tmp/gphotopaper_tests.xcresult \
+            -enableCodeCoverage YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             test \
             -only-testing:GPhotoPaperTests
+
+      - name: Coverage gate
+        run: |
+          set -euo pipefail
+          # Gate is unit-test-only; UI tests run separately and do not affect /tmp/gphotopaper_tests.xcresult.
+          bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult "${MIN_UNIT_TEST_COVERAGE_PERCENT}" GPhotoPaper
+
+      - name: UI tests (hermetic, ad-hoc signed)
+        run: |
+          set -euo pipefail
+          # UI tests require a runnable test runner app. Ad-hoc sign it, but strip entitlements so this works without a dev cert.
+          xcodebuild \
+            -scheme GPhotoPaper \
+            -destination 'platform=macOS' \
+            -derivedDataPath /tmp/gphotopaper_deriveddata_ui_test \
+            -resultBundlePath /tmp/gphotopaper_ui_tests.xcresult \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            test \
+            -only-testing:GPhotoPaperUITests
+
+      - name: Upload xcresult bundles (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresults
+          path: |
+            /tmp/gphotopaper_tests.xcresult
+            /tmp/gphotopaper_ui_tests.xcresult
 
       - name: Create distributable zip (for artifacts)
         run: |

@@ -104,11 +104,39 @@ Run tests from CLI:
 xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata test
 ```
 
-If UI tests fail to bootstrap in your environment, run only unit tests:
+Run only unit tests:
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata test -only-testing:GPhotoPaperTests
+xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata_test test -only-testing:GPhotoPaperTests
 ```
+
+Run unit tests with code coverage (and produce an `.xcresult` bundle you can inspect in Xcode):
+
+```bash
+xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata_test -resultBundlePath /tmp/gphotopaper_tests.xcresult -enableCodeCoverage YES test -only-testing:GPhotoPaperTests
+bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult 50 GPhotoPaper
+```
+
+CI enforces this as a gate (unit tests only): `GPhotoPaper.app` line coverage must be at least 50%.
+To run the same gate locally, use `just coverage` (or `just coverage-report` for a report without enforcing a minimum).
+
+Run only UI tests (hermetic; no network/auth required):
+
+```bash
+xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata_ui_test -resultBundlePath /tmp/gphotopaper_ui_tests.xcresult CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="-" CODE_SIGN_ENTITLEMENTS="" test -only-testing:GPhotoPaperUITests
+```
+
+Convenience `just` recipes:
+
+```bash
+just test      # unit tests
+just coverage  # unit tests + coverage gate
+just ui-test   # UI tests
+just test-all  # unit + UI tests
+```
+
+UI tests (Debug builds) launch the app with `-ui-testing` to use local fixture services (no interactive sign-in, no Graph calls). In UI testing mode, Advanced also shows a small “Menu Bar (UI testing)” harness so menu actions can be tested without relying on the system status bar UI.
+On macOS, Xcode UI tests may also prompt to close other running apps (“Remove Other Apps”) to improve reliability.
 
 #### RAW photos (LibRaw)
 

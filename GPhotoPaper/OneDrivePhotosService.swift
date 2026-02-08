@@ -27,7 +27,7 @@ protocol OneDriveAccessTokenProviding {
 
 extension OneDriveAuthService: OneDriveAccessTokenProviding {}
 
-final class OneDrivePhotosService: ObservableObject, PhotosService {
+final class OneDrivePhotosService: PhotosServiceModel {
     private let authService: any OneDriveAccessTokenProviding
     private let session: URLSession
     private let baseURL = URL(string: "https://graph.microsoft.com/v1.0")!
@@ -35,9 +35,10 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
     init(authService: any OneDriveAccessTokenProviding, session: URLSession = .shared) {
         self.authService = authService
         self.session = session
+        super.init()
     }
 
-    func listAlbums() async throws -> [OneDriveAlbum] {
+    override func listAlbums() async throws -> [OneDriveAlbum] {
         let filtered = try await listBundlesAsDriveItems(filterToAlbums: true)
         if !filtered.isEmpty {
             return filtered
@@ -52,7 +53,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
             .map { OneDriveAlbum(id: $0.id, webUrl: $0.webUrl, name: $0.name) }
     }
 
-    func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum? {
+    override func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum? {
         do {
             let bundleItem: DriveItem = try await get(
                 "/me/drive/bundles/\(albumId)",
@@ -79,7 +80,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
         return OneDriveAlbum(id: item.id, webUrl: item.webUrl, name: item.name)
     }
 
-    func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
+    override func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
         let expandedChildren: DriveItemExpandedChildrenResponse = try await get(
             "/me/drive/items/\(albumId)",
             query: [
@@ -103,7 +104,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
         return results
     }
 
-    func probeAlbumUsablePhotoCountFirstPage(albumId: String) async throws -> Int {
+    override func probeAlbumUsablePhotoCountFirstPage(albumId: String) async throws -> Int {
         let expandedChildren: DriveItemExpandedChildrenResponse = try await get(
             "/me/drive/items/\(albumId)",
             query: [
@@ -119,7 +120,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
         return Self.mediaItems(from: expandedChildren.children ?? []).count
     }
 
-    func downloadImageData(for item: MediaItem) async throws -> Data {
+    override func downloadImageData(for item: MediaItem) async throws -> Data {
         if let url = item.downloadUrl {
             let (data, response) = try await session.data(from: url)
             let http = response as? HTTPURLResponse
@@ -252,7 +253,7 @@ final class OneDrivePhotosService: ObservableObject, PhotosService {
     }
 
 #if DEBUG
-    func debugProbeAlbumListing() async -> String {
+    override func debugProbeAlbumListing() async -> String {
         struct ProbeResponse {
             let label: String
             let status: Int?

@@ -1,6 +1,8 @@
 derived_data := "/tmp/gphotopaper_deriveddata_release"
 derived_data_debug := "/tmp/gphotopaper_deriveddata_debug"
 derived_data_test := "/tmp/gphotopaper_deriveddata_test"
+derived_data_ui_test := "/tmp/gphotopaper_deriveddata_ui_test"
+min_unit_test_coverage_percent := "50"
 out_dir := "build/release-app"
 out_dir_debug := "build/debug-app"
 app_name := "GPhotoPaper.app"
@@ -37,6 +39,29 @@ debug-app:
   {{bundle_script}} {{out_dir_debug}}/{{app_name}} {{app_binary}} {{entitlements}} {{bundle_homebrew_prefix}}
   @echo "Built {{out_dir_debug}}/{{app_name}}"
 
-# Run unit tests (skips UI tests, which require extra app bootstrapping).
+# Run unit tests (kept fast; UI tests are a separate target).
 test:
   xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} CODE_SIGNING_ALLOWED=NO test -skip-testing:{{ui_test_target}}
+
+# Run unit tests with code coverage and enforce CI's minimum.
+coverage:
+  rm -rf /tmp/gphotopaper_tests.xcresult
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/gphotopaper_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:GPhotoPaperTests
+  bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult {{min_unit_test_coverage_percent}} {{scheme}}
+
+# Run unit tests with code coverage and print the coverage report (no minimum enforced).
+coverage-report:
+  rm -rf /tmp/gphotopaper_tests.xcresult
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/gphotopaper_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:GPhotoPaperTests
+  bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult 0 {{scheme}}
+
+# Run UI tests (uses a hermetic in-app UI testing mode; no network/auth required).
+ui-test:
+  # UI tests require a runnable test runner app. Ad-hoc sign it, but strip entitlements so this works without a dev cert.
+  rm -rf {{derived_data_ui_test}}
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_ui_test}} CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="-" CODE_SIGN_ENTITLEMENTS="" test -only-testing:{{ui_test_target}}
+
+# Run unit + UI tests.
+test-all:
+  just test
+  just ui-test

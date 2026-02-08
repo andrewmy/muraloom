@@ -4,9 +4,10 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: SettingsModel
     @Binding var showAdvancedControls: Bool
-    @EnvironmentObject var authService: OneDriveAuthService
-    @EnvironmentObject var photosService: OneDrivePhotosService
+    @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var photosService: PhotosServiceModel
     @EnvironmentObject var wallpaperManager: WallpaperManager
+    @EnvironmentObject var appTesting: AppTesting
 
     private let usablePhotosHelp =
         "Usable photos are image items (image/* files or items with image/photo metadata). Videos are ignored. RAW photos (ARW/DNG/etc) are included only when LibRaw support is enabled. The quick check scans only the first page."
@@ -70,6 +71,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
+                    .accessibilityIdentifier("auth.signOut")
                 } else {
                     Button {
                         isSigningIn = true
@@ -86,6 +88,7 @@ struct SettingsView: View {
                         Label(isSigningIn ? "Signing In…" : "Sign In", systemImage: "person.crop.circle.badge.plus")
                     }
                     .disabled(isSigningIn)
+                    .accessibilityIdentifier("auth.signIn")
                 }
 
                 if let oneDriveError, !oneDriveError.isEmpty {
@@ -94,6 +97,7 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("auth.error")
                 }
             }
 
@@ -106,6 +110,7 @@ struct SettingsView: View {
                             }
                         }
                         .disabled(isLoadingAlbums)
+                        .accessibilityIdentifier("albums.load")
 
                         Link("Manage Albums…", destination: URL(string: "https://photos.onedrive.com")!)
                     }
@@ -143,6 +148,7 @@ struct SettingsView: View {
                             }
                         }
                             .pickerStyle(.menu)
+                            .accessibilityIdentifier("albums.picker")
 
                         if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
                             if let count = selectedAlbumUsableCountFirstPage {
@@ -204,6 +210,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("wallpaper.frequency")
 
                 let hasAlbum = (settings.selectedAlbumId?.isEmpty == false)
                 let canChangeNow = authService.isSignedIn && hasAlbum
@@ -224,6 +231,7 @@ struct SettingsView: View {
                 }
                 .help("Pauses only scheduled wallpaper changes (the timer). Manual changes still work.")
                 .disabled(authService.isSignedIn == false)
+                .accessibilityIdentifier("wallpaper.pauseResume")
 
                 Button {
                     wallpaperManager.requestWallpaperUpdate(trigger: .manual)
@@ -232,14 +240,17 @@ struct SettingsView: View {
                 }
                 .disabled(wallpaperManager.isUpdating || canChangeNow == false)
                 .help(canChangeNow ? "" : (authService.isSignedIn ? "Select an album to enable wallpaper changes." : "Sign in to enable wallpaper changes."))
+                .accessibilityIdentifier("wallpaper.changeNow")
 
                 Toggle("Pick Randomly", isOn: $settings.pickRandomly)
+                    .accessibilityIdentifier("wallpaper.pickRandomly")
 
                 HStack {
                     Text("Minimum Picture Width:")
                     TextField("", value: $settings.minimumPictureWidth, formatter: NumberFormatter())
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
+                        .accessibilityIdentifier("wallpaper.minimumWidth")
                     Text("px")
                     let recommended = recommendedMinimumPictureWidthPixels
                     Button("Use Recommended (\(Int(recommended))px)") {
@@ -256,6 +267,7 @@ struct SettingsView: View {
 #endif
 
                 Toggle("Only Horizontal Photos", isOn: $settings.horizontalPhotosOnly)
+                    .accessibilityIdentifier("wallpaper.horizontalOnly")
 
                 Picker("Fill Mode", selection: $settings.wallpaperFillMode) {
                     ForEach(WallpaperFillMode.allCases) { mode in
@@ -263,6 +275,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .accessibilityIdentifier("wallpaper.fillMode")
             }
 
             Section {
@@ -280,56 +293,73 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 4)
+                .accessibilityIdentifier("advanced.toggle")
 
                 if showAdvancedControls {
                     VStack(alignment: .leading, spacing: 12) {
+#if DEBUG
+                        if appTesting.isUITesting {
+                            Group {
+                                Text("Menu Bar (UI testing)")
+                                    .font(.system(.subheadline, weight: .semibold))
+
+                                MenuBarMenuView()
+                            }
+
+                            Divider()
+                        }
+#endif
+
                         Group {
                             Text("Album")
                                 .font(.system(.subheadline, weight: .semibold))
 
 	                            if authService.isSignedIn {
-	                                TextField(
-	                                    "Album ID (manual)",
-	                                    text: Binding(
-	                                        get: { settings.selectedAlbumId ?? "" },
-	                                        set: { settings.selectedAlbumId = $0.isEmpty ? nil : $0 }
-	                                    )
-	                                )
-	                                .textFieldStyle(.roundedBorder)
-	                                .frame(maxWidth: 420)
+		                                TextField(
+		                                    "Album ID (manual)",
+		                                    text: Binding(
+		                                        get: { settings.selectedAlbumId ?? "" },
+		                                        set: { settings.selectedAlbumId = $0.isEmpty ? nil : $0 }
+		                                    )
+		                                )
+		                                .textFieldStyle(.roundedBorder)
+		                                .frame(maxWidth: 420)
+                                        .accessibilityIdentifier("advanced.albumId")
 
 	                                if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
-	                                    Button("Validate Album ID") {
+		                                    Button("Validate Album ID") {
+		                                        oneDriveError = nil
+		                                        Task {
+	                                            do {
+	                                                if let album = try await photosService.verifyAlbumExists(albumId: albumId) {
+	                                                    applySelectedAlbum(album)
+	                                                } else {
+	                                                    oneDriveError = "That ID could not be verified as an accessible OneDrive album."
+	                                                }
+	                                            } catch {
+	                                                oneDriveError = error.localizedDescription
+	                                            }
+	                                        }
+	                                    }
+                                        .accessibilityIdentifier("advanced.validateAlbumId")
+
+	                                    Button("Check Album Photos (full scan)") {
 	                                        oneDriveError = nil
 	                                        Task {
-                                            do {
-                                                if let album = try await photosService.verifyAlbumExists(albumId: albumId) {
-                                                    applySelectedAlbum(album)
-                                                } else {
-                                                    oneDriveError = "That ID could not be verified as an accessible OneDrive album."
-                                                }
-                                            } catch {
-                                                oneDriveError = error.localizedDescription
-                                            }
-                                        }
-                                    }
-
-                                    Button("Check Album Photos (full scan)") {
-                                        oneDriveError = nil
-                                        Task {
-                                            do {
-                                                let photos = try await photosService.searchPhotos(inAlbumId: albumId)
-                                                settings.albumPictureCount = photos.count
-                                                settings.showNoPicturesWarning = photos.isEmpty
-                                            } catch {
-                                                oneDriveError = error.localizedDescription
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                Text("Sign in to use advanced album tools.")
-                                    .font(.system(.caption))
+	                                            do {
+	                                                let photos = try await photosService.searchPhotos(inAlbumId: albumId)
+	                                                settings.albumPictureCount = photos.count
+	                                                settings.showNoPicturesWarning = photos.isEmpty
+	                                            } catch {
+	                                                oneDriveError = error.localizedDescription
+	                                            }
+	                                        }
+	                                    }
+                                        .accessibilityIdentifier("advanced.fullScan")
+	                                }
+	                            } else {
+	                                Text("Sign in to use advanced album tools.")
+	                                    .font(.system(.caption))
                                     .foregroundStyle(.secondary)
                             }
                         }

@@ -1,17 +1,44 @@
+import Foundation
 import SwiftUI
 
 @main
 struct GPhotoPaperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var settings: SettingsModel
-    @StateObject private var authService: OneDriveAuthService
-    @StateObject private var photosService: OneDrivePhotosService
+    @StateObject private var authService: AuthService
+    @StateObject private var photosService: PhotosServiceModel
     @StateObject private var wallpaperManager: WallpaperManager
+    @StateObject private var appTesting: AppTesting
 
     init() {
-        let settings = SettingsModel()
-        let authService = OneDriveAuthService()
-        let photosService = OneDrivePhotosService(authService: authService)
+        let isUITesting = AppEnvironment.isUITesting
+
+        let settings: SettingsModel
+        let authService: AuthService
+        let photosService: PhotosServiceModel
+
+        if isUITesting {
+            let defaults = UserDefaults(suiteName: AppEnvironment.uiTestUserDefaultsSuiteName)
+            defaults?.removePersistentDomain(forName: AppEnvironment.uiTestUserDefaultsSuiteName)
+
+            let model = SettingsModel(userDefaults: defaults ?? .standard)
+            model.changeFrequency = .never
+            model.isPaused = true
+            settings = model
+
+            authService = UITestAuthService()
+
+            let mode = AppEnvironment.uiTestPhotosMode
+            photosService = UITestPhotosService(config: .init(mode: mode))
+        } else {
+            settings = SettingsModel()
+
+            let liveAuth = OneDriveAuthService()
+            authService = liveAuth
+            photosService = OneDrivePhotosService(authService: liveAuth)
+        }
+
+        _appTesting = StateObject(wrappedValue: AppTesting(isUITesting: isUITesting))
         _settings = StateObject(wrappedValue: settings)
         _authService = StateObject(wrappedValue: authService)
         _photosService = StateObject(wrappedValue: photosService)
@@ -31,6 +58,7 @@ struct GPhotoPaperApp: App {
                 .environmentObject(authService)
                 .environmentObject(photosService)
                 .environmentObject(wallpaperManager)
+                .environmentObject(appTesting)
                 .onAppear {
                     if authService.isSignedIn {
                         wallpaperManager.startWallpaperUpdates()
@@ -107,4 +135,30 @@ struct OneDriveAlbum: Codable {
     var id: String
     var webUrl: URL?
     var name: String?
+}
+
+enum AppEnvironment {
+    static let uiTestUserDefaultsSuiteName = "lv.andr.GPhotoPaper.uitests"
+    static let uiTestPhotosModeEnvironmentKey = "GPHOTOPAPER_UI_TEST_PHOTOS_MODE"
+
+    static var isUITesting: Bool {
+#if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-ui-testing") { return true }
+        if ProcessInfo.processInfo.environment["GPHOTOPAPER_UI_TESTING"] == "1" { return true }
+        return false
+#else
+        return false
+#endif
+    }
+
+    static var uiTestPhotosMode: UITestPhotosService.PhotosMode {
+#if DEBUG
+        guard isUITesting else { return .normal }
+        let raw = (ProcessInfo.processInfo.environment[uiTestPhotosModeEnvironmentKey] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return UITestPhotosService.PhotosMode(rawValue: raw) ?? .normal
+#else
+        return .normal
+#endif
+    }
 }

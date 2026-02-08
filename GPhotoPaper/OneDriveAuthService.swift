@@ -45,10 +45,7 @@ import AppKit
 import MSAL
 
 @MainActor
-final class OneDriveAuthService: ObservableObject {
-    @Published private(set) var isSignedIn: Bool = false
-    @Published private(set) var signedInUsername: String?
-
+final class OneDriveAuthService: AuthService {
     private let config: OneDriveConfig
     private var application: MSALPublicClientApplication?
     private var applicationInitError: Error?
@@ -56,6 +53,7 @@ final class OneDriveAuthService: ObservableObject {
 
     init(config: OneDriveConfig = OneDriveConfig()) {
         self.config = config
+        super.init()
 
         guard config.isConfigured else { return }
         do {
@@ -79,7 +77,7 @@ final class OneDriveAuthService: ObservableObject {
         }
     }
 
-    func signOut() {
+    override func signOut() {
         let accountToRemove = currentAccount
         currentAccount = nil
         isSignedIn = false
@@ -92,7 +90,7 @@ final class OneDriveAuthService: ObservableObject {
         }
     }
 
-    func validAccessToken() async throws -> String {
+    override func validAccessToken() async throws -> String {
         let application = try ensureApplication()
         let account = try ensureAccount(application: application)
 
@@ -105,7 +103,7 @@ final class OneDriveAuthService: ObservableObject {
         }
     }
 
-    func signIn() async throws {
+    override func signIn() async throws {
         let application = try ensureApplication()
 
         let webviewParams = MSALWebviewParameters(authPresentationViewController: presentationViewController())
@@ -234,10 +232,7 @@ import CryptoKit
 import Security
 
 @MainActor
-final class OneDriveAuthService: ObservableObject {
-    @Published private(set) var isSignedIn: Bool = false
-    @Published private(set) var signedInUsername: String?
-
+final class OneDriveAuthService: AuthService {
     private let config: OneDriveConfig
     private let keychain = OneDriveTokenKeychain()
     private var authSession: ASWebAuthenticationSession?
@@ -250,18 +245,20 @@ final class OneDriveAuthService: ObservableObject {
 
     init(config: OneDriveConfig = OneDriveConfig()) {
         self.config = config
+        super.init()
+
         self.token = keychain.load()
         self.isSignedIn = self.token != nil
         self.signedInUsername = nil
     }
 
-    func signOut() {
+    override func signOut() {
         token = nil
         signedInUsername = nil
         keychain.delete()
     }
 
-    func validAccessToken() async throws -> String {
+    override func validAccessToken() async throws -> String {
         guard let currentToken = self.token else { throw OneDriveAuthError.notSignedIn }
         if !currentToken.isExpired { return currentToken.accessToken }
 
@@ -271,7 +268,7 @@ final class OneDriveAuthService: ObservableObject {
         return refreshed.accessToken
     }
 
-    func signIn() async throws {
+    override func signIn() async throws {
         guard config.isConfigured else { throw OneDriveAuthError.notConfigured }
 
         let pkce = PKCE()
