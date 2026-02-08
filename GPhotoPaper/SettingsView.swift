@@ -196,7 +196,7 @@ struct SettingsView: View {
             Section(header: Text("Wallpaper Change Settings")) {
                 Picker("Change Frequency", selection: $settings.changeFrequency) {
                     ForEach(WallpaperChangeFrequency.allCases) { frequency in
-                        Text(frequency.rawValue).tag(frequency)
+                        Text(frequency.displayName).tag(frequency)
                     }
                 }
                 .pickerStyle(.menu)
@@ -276,7 +276,7 @@ struct SettingsView: View {
 
                 Picker("Fill Mode", selection: $settings.wallpaperFillMode) {
                     ForEach(WallpaperFillMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(mode.displayName).tag(mode)
                     }
                 }
                 .pickerStyle(.menu)

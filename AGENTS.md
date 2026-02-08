@@ -46,6 +46,21 @@
 - Prefer concise errors and minimal UI state in views.
 - When making behavioral changes, **add or update unit tests** to cover them whenever practical.
 
+### Persistence (UserDefaults)
+
+- Store **stable, machine-readable values** in `UserDefaults` (e.g. enum raw values like `hourly`, not user-facing strings like “Every Hour”).
+- Keep user-facing labels separate (e.g. `displayName`) so they can change/localize without breaking stored settings.
+- When loading settings, avoid writing back to `UserDefaults` during initialization/rehydration (guard with an `isLoadingFromDisk` flag or similar) to prevent accidentally removing keys.
+- Don’t add migrations unless explicitly needed; prefer “clean slate” assumptions for new schema decisions unless the product explicitly requires preserving legacy installs.
+
+### Menu Bar UX (MVP)
+
+- The app is a normal Dock app; the menu bar icon is supplemental for quick actions and status.
+- The settings window is the main `WindowGroup` and is opened/foregrounded via `openWindow(id: "settings")`.
+- Ensure the app keeps running after closing the settings window (menu bar icon must remain usable).
+- For interactive sign-in launched from the menu bar, open/activate the settings window first so MSAL has a presentation context.
+- “Pause” means pause **scheduled/timer-driven** changes only (manual “Change Now” still works).
+
 ### Context
 
 Always use context7 when I need code generation, setup or configuration steps, or
