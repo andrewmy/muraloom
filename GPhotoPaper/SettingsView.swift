@@ -67,9 +67,6 @@ struct SettingsView: View {
                         albums = []
                         didAttemptLoadAlbums = false
                         didAutoLoadAlbums = false
-                        settings.selectedAlbumId = nil
-                        settings.selectedAlbumName = nil
-                        settings.selectedAlbumWebUrl = nil
                     }
                 } else {
                     Button(isSigningIn ? "Signing In…" : "Sign In") {
@@ -204,6 +201,55 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
+                Toggle("Pause Automatic Changes", isOn: $settings.isPaused)
+                    .help("Pauses only scheduled wallpaper changes. Manual “Change Wallpaper Now” still works.")
+
+                LabeledContent("Current photo") {
+                    let name = (settings.lastSetWallpaperItemName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let id = (settings.lastSetWallpaperItemId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let display = name.isEmpty == false ? name : id
+                    Text(display.isEmpty ? "—" : display)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(display.isEmpty ? "No wallpaper has been set by GPhotoPaper yet." : display)
+                }
+
+                LabeledContent("Next change") {
+                    let hasAlbum = (settings.selectedAlbumId?.isEmpty == false)
+                    if authService.isSignedIn == false {
+                        Text("Sign in")
+                            .foregroundStyle(.secondary)
+                    } else if hasAlbum == false {
+                        Text("Select an album")
+                            .foregroundStyle(.secondary)
+                    } else if settings.isPaused {
+                        Text("Paused")
+                            .foregroundStyle(.secondary)
+                    } else if settings.changeFrequency == .never {
+                        Text("Off")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        let interval = WallpaperManager.intervalSeconds(for: settings.changeFrequency)
+                        let due = WallpaperManager.computeNextDueDate(
+                            now: Date(),
+                            lastSuccessfulWallpaperUpdate: settings.lastSuccessfulWallpaperUpdate,
+                            intervalSeconds: interval,
+                            hasSelectedAlbum: true,
+                            isPaused: false,
+                            lastAttemptDate: nil
+                        )
+                        if let due {
+                            Text(due, style: .relative)
+                                .foregroundStyle(.secondary)
+                                .help(due.formatted(date: .abbreviated, time: .shortened))
+                        } else {
+                            Text("—")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 Toggle("Pick Randomly", isOn: $settings.pickRandomly)
 
                 HStack {
@@ -237,10 +283,25 @@ struct SettingsView: View {
             }
 
             Section {
+                let hasAlbum = (settings.selectedAlbumId?.isEmpty == false)
+                let canChangeNow = authService.isSignedIn && hasAlbum
                 Button(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now") {
                     wallpaperManager.requestWallpaperUpdate(trigger: .manual)
                 }
-                .disabled(wallpaperManager.isUpdating)
+                .disabled(wallpaperManager.isUpdating || canChangeNow == false)
+                .help(canChangeNow ? "" : (authService.isSignedIn ? "Select an album to enable wallpaper changes." : "Sign in to enable wallpaper changes."))
+
+                Button(settings.isPaused ? "Resume Automatic Changes" : "Pause Automatic Changes") {
+                    settings.isPaused.toggle()
+                }
+                .help("Pauses only scheduled wallpaper changes (the timer). Manual changes still work.")
+                .disabled(authService.isSignedIn == false)
+
+                if canChangeNow == false {
+                    Text(authService.isSignedIn ? "Select an album to enable changes." : "Sign in to enable changes.")
+                        .font(.system(.caption))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -383,15 +444,17 @@ struct SettingsView: View {
                     Text("Current photo")
                     Spacer()
                     let name = (settings.lastSetWallpaperItemName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    if name.isEmpty {
+                    let id = (settings.lastSetWallpaperItemId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let display = name.isEmpty == false ? name : id
+                    if display.isEmpty {
                         Text("—")
                             .foregroundStyle(.secondary)
                     } else {
-                        Text(name)
+                        Text(display)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                            .help(name)
+                            .help(display)
                     }
                 }
 
@@ -411,16 +474,36 @@ struct SettingsView: View {
                 HStack {
                     Text("Next change")
                     Spacer()
-                    if settings.changeFrequency == .never {
-                        Text("—")
+                    if authService.isSignedIn == false {
+                        Text("Sign in")
                             .foregroundStyle(.secondary)
-                    } else if let next = wallpaperManager.nextScheduledUpdate {
-                        Text(next, style: .relative)
+                    } else if (settings.selectedAlbumId?.isEmpty ?? true) {
+                        Text("Select album")
                             .foregroundStyle(.secondary)
-                            .help(next.formatted(date: .abbreviated, time: .shortened))
+                    } else if settings.isPaused {
+                        Text("Paused")
+                            .foregroundStyle(.secondary)
+                    } else if settings.changeFrequency == .never {
+                        Text("Off")
+                            .foregroundStyle(.secondary)
                     } else {
-                        Text("—")
-                            .foregroundStyle(.secondary)
+                        let interval = WallpaperManager.intervalSeconds(for: settings.changeFrequency)
+                        let due = WallpaperManager.computeNextDueDate(
+                            now: Date(),
+                            lastSuccessfulWallpaperUpdate: settings.lastSuccessfulWallpaperUpdate,
+                            intervalSeconds: interval,
+                            hasSelectedAlbum: true,
+                            isPaused: false,
+                            lastAttemptDate: nil
+                        )
+                        if let due {
+                            Text(due, style: .relative)
+                                .foregroundStyle(.secondary)
+                                .help(due.formatted(date: .abbreviated, time: .shortened))
+                        } else {
+                            Text("—")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -456,6 +539,7 @@ struct SettingsView: View {
 
         await loadAlbumsIfNeeded(auto: true)
         await validateStoredSelectionIfNeeded()
+        wallpaperManager.startWallpaperUpdates()
     }
 
     @MainActor

@@ -88,6 +88,39 @@ final class WallpaperManager: ObservableObject {
         return list
     }
 
+    nonisolated static func computeNextDueDate(
+        now: Date,
+        lastSuccessfulWallpaperUpdate: Date?,
+        intervalSeconds: TimeInterval?,
+        hasSelectedAlbum: Bool,
+        isPaused: Bool,
+        lastAttemptDate: Date?,
+        minimumLeadTime: TimeInterval = 60,
+        minimumRetryDelay: TimeInterval = 300
+    ) -> Date? {
+        guard isPaused == false else { return nil }
+        guard hasSelectedAlbum else { return nil }
+        guard let intervalSeconds else { return nil }
+
+        var due = (lastSuccessfulWallpaperUpdate ?? now).addingTimeInterval(intervalSeconds)
+
+        // MVP: avoid changing wallpaper immediately on app launch.
+        let earliest = now.addingTimeInterval(max(0, minimumLeadTime))
+        if due < earliest {
+            due = earliest
+        }
+
+        // Avoid tight failure loops when due is already reached but updates keep failing.
+        if let lastAttemptDate {
+            let retryAfter = lastAttemptDate.addingTimeInterval(max(0, minimumRetryDelay))
+            if due < retryAfter {
+                due = retryAfter
+            }
+        }
+
+        return due
+    }
+
     func startWallpaperUpdates() {
         scheduleNextTimer()
     }
@@ -139,7 +172,7 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-    private func intervalSeconds(for frequency: WallpaperChangeFrequency) -> TimeInterval? {
+    nonisolated static func intervalSeconds(for frequency: WallpaperChangeFrequency) -> TimeInterval? {
         switch frequency {
         case .never:
             return nil
@@ -156,37 +189,20 @@ final class WallpaperManager: ObservableObject {
         wallpaperTimer?.invalidate()
         wallpaperTimer = nil
 
-        guard let interval = intervalSeconds(for: settings.changeFrequency) else {
-            nextScheduledUpdate = nil
-            return
-        }
-
-        guard let selectedAlbumId = settings.selectedAlbumId, !selectedAlbumId.isEmpty else {
-            nextScheduledUpdate = nil
-            return
-        }
-
         let now = Date()
-        let lastSuccess = settings.lastSuccessfulWallpaperUpdate
-        var due = (lastSuccess ?? now).addingTimeInterval(interval)
-
-        // MVP: avoid changing wallpaper immediately on app launch.
-        let minimumLeadTime: TimeInterval = 60
-        let earliest = now.addingTimeInterval(minimumLeadTime)
-        if due < earliest {
-            due = earliest
+        let interval = Self.intervalSeconds(for: settings.changeFrequency)
+        let hasSelectedAlbum = (settings.selectedAlbumId?.isEmpty == false)
+        guard let due = Self.computeNextDueDate(
+            now: now,
+            lastSuccessfulWallpaperUpdate: settings.lastSuccessfulWallpaperUpdate,
+            intervalSeconds: interval,
+            hasSelectedAlbum: hasSelectedAlbum,
+            isPaused: settings.isPaused,
+            lastAttemptDate: lastAttemptDate
+        ) else {
+            nextScheduledUpdate = nil
+            return
         }
-
-        // Avoid tight failure loops when due is already reached but updates keep failing.
-        let minimumRetryDelay: TimeInterval = 300
-        if let lastAttemptDate {
-            let retryAfter = lastAttemptDate.addingTimeInterval(minimumRetryDelay)
-            if due < retryAfter {
-                due = retryAfter
-            }
-        }
-
-        nextScheduledUpdate = due
 
         let timeInterval = max(1, due.timeIntervalSinceNow)
         wallpaperTimer = Timer(timeInterval: timeInterval, repeats: false) { [weak self] _ in
@@ -212,7 +228,8 @@ final class WallpaperManager: ObservableObject {
         }
 
         guard let albumId = settings.selectedAlbumId, !albumId.isEmpty else {
-            print("Error: No OneDrive album selected.")
+            lastUpdateError = "No OneDrive album selected."
+            updateStage = .idle
             return
         }
 
@@ -235,7 +252,17 @@ final class WallpaperManager: ObservableObject {
             let wallpaperDirURL = try ensureWallpaperDirectoryURL()
             let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
 
-            let maxAttempts = min(3, filteredItems.count)
+            let currentWallpaperURL: URL? = {
+                guard let screen = NSScreen.screens.first else { return nil }
+                guard let url = try? NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
+                let standardized = url.standardizedFileURL
+                let filename = standardized.lastPathComponent
+                guard filename.hasPrefix("wallpaper-"), filename.hasSuffix(".jpg") else { return nil }
+                guard standardized.deletingLastPathComponent().standardizedFileURL == wallpaperDirURL.standardizedFileURL else { return nil }
+                return standardized
+            }()
+
+            let maxAttempts = min(currentWallpaperURL == nil ? 3 : 5, filteredItems.count)
             let candidates = Self.buildWallpaperCandidates(
                 filteredItems: filteredItems,
                 maxAttempts: maxAttempts,
@@ -260,6 +287,10 @@ final class WallpaperManager: ObservableObject {
                     updateStage = .selectingCandidate(attempt: i + 1, total: candidates.count, name: candidateName)
 
                     let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
+                    if let currentWallpaperURL, filteredItems.count > 1,
+                       wallpaperFileURL.standardizedFileURL == currentWallpaperURL {
+                        continue
+                    }
                     if isUsableCachedWallpaperFile(at: wallpaperFileURL) {
                         updateStage = .usingCachedWallpaper(name: candidateName)
                         var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
@@ -282,8 +313,7 @@ final class WallpaperManager: ObservableObject {
                         try setWallpaperOnAllScreens(wallpaperFileURL, options: options)
 
                         updatedSequentialIndex = candidate.filteredIndex
-                        settings.lastSetWallpaperItemId = candidate.item.id
-                        settings.lastSetWallpaperItemName = candidate.item.name
+                        persistLastSetWallpaperItem(candidate.item)
                         conversionErrors.removeAll()
                         didSetWallpaper = true
                         cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
@@ -326,8 +356,7 @@ final class WallpaperManager: ObservableObject {
                     try setWallpaperOnAllScreens(wallpaperFileURL, options: options)
 
                     updatedSequentialIndex = candidate.filteredIndex
-                    settings.lastSetWallpaperItemId = candidate.item.id
-                    settings.lastSetWallpaperItemName = candidate.item.name
+                    persistLastSetWallpaperItem(candidate.item)
                     conversionErrors.removeAll()
                     didSetWallpaper = true
                     cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
@@ -392,6 +421,17 @@ final class WallpaperManager: ObservableObject {
 
             return true
         }
+    }
+
+    private func persistLastSetWallpaperItem(_ item: MediaItem) {
+        let trimmedId = item.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedId.isEmpty == false {
+            settings.lastSetWallpaperItemId = trimmedId
+        }
+
+        let trimmedName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        settings.lastSetWallpaperItemName = trimmedName.isEmpty ? nil : trimmedName
+        settings.flushToDisk()
     }
 
     private func ensureWallpaperDirectoryURL() throws -> URL {

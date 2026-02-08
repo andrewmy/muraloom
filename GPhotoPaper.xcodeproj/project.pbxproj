@@ -427,13 +427,13 @@
 		2576DC052E574FBD0008C4F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 25A0D1D02F0B7A6C00A1B2C3 /* GPhotoPaper/Config.xcconfig */;
-				buildSettings = {
-					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-					ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-					ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-					CODE_SIGN_ENTITLEMENTS = GPhotoPaper/GPhotoPaper.entitlements;
-					"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-					CODE_SIGN_STYLE = Automatic;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = GPhotoPaper/GPhotoPaper.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -462,13 +462,13 @@
 		2576DC062E574FBD0008C4F3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 25A0D1D02F0B7A6C00A1B2C3 /* GPhotoPaper/Config.xcconfig */;
-				buildSettings = {
-					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-					ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-					ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-					CODE_SIGN_ENTITLEMENTS = GPhotoPaper/GPhotoPaper.entitlements;
-					"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
-					CODE_SIGN_STYLE = Automatic;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = GPhotoPaper/GPhotoPaper.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -604,14 +604,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-			25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */ = {
-				isa = XCRemoteSwiftPackageReference;
-				repositoryURL = "https://github.com/AzureAD/microsoft-authentication-library-for-objc";
-				requirement = {
-					kind = exactVersion;
-					version = 1.9.0;
-				};
+		25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AzureAD/microsoft-authentication-library-for-objc";
+			requirement = {
+				kind = exactVersion;
+				version = 1.9.0;
 			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
