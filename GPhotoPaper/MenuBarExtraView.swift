@@ -166,52 +166,68 @@ struct MenuBarMenuView: View {
 
             Divider()
 
-            Button(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now") {
+            Button {
                 wallpaperManager.requestWallpaperUpdate(trigger: .manual)
+            } label: {
+                Label(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now", systemImage: "sparkles")
             }
             .disabled(wallpaperManager.isUpdating || authService.isSignedIn == false || hasSelectedAlbum == false)
 
             if settings.isPaused {
-                Button("Resume Automatic Changes") {
+                Button {
                     settings.isPaused = false
                     wallpaperManager.startWallpaperUpdates()
+                } label: {
+                    Label("Resume Automatic Changes", systemImage: "play.fill")
                 }
             } else {
-                Button("Pause Automatic Changes") {
+                Button {
                     settings.isPaused = true
                     wallpaperManager.stopWallpaperUpdates()
+                } label: {
+                    Label("Pause Automatic Changes", systemImage: "pause.fill")
                 }
             }
 
             Divider()
 
-            Button("Open Settings…") {
+            Button {
                 activateAppAndOpenSettings()
+            } label: {
+                Label("Open Settings…", systemImage: "gearshape")
             }
 
             if let url = settings.selectedAlbumWebUrl {
-                Button("Open Selected Album") {
+                Button {
                     NSWorkspace.shared.open(url)
+                } label: {
+                    Label("Open Selected Album", systemImage: "photo.on.rectangle.angled")
                 }
             }
 
             Divider()
 
             if authService.isSignedIn {
-                Button("Sign Out") {
+                Button {
                     signOut()
+                } label: {
+                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                 }
             } else {
-                Button(isSigningIn ? "Signing In…" : "Sign In…") {
+                Button {
                     beginSignIn()
+                } label: {
+                    Label(isSigningIn ? "Signing In…" : "Sign In…", systemImage: "person.crop.circle.badge.plus")
                 }
                 .disabled(isSigningIn)
             }
 
             Divider()
 
-            Button("Quit GPhotoPaper") {
+            Button {
                 NSApp.terminate(nil)
+            } label: {
+                Label("Quit GPhotoPaper", systemImage: "power")
             }
         }
         .task(id: authService.isSignedIn) {

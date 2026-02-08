@@ -61,15 +61,17 @@ struct SettingsView: View {
                     } else {
                         Text("Signed in.")
                     }
-                    Button("Sign Out") {
+                    Button {
                         authService.signOut()
                         wallpaperManager.stopWallpaperUpdates()
                         albums = []
                         didAttemptLoadAlbums = false
                         didAutoLoadAlbums = false
+                    } label: {
+                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 } else {
-                    Button(isSigningIn ? "Signing In…" : "Sign In") {
+                    Button {
                         isSigningIn = true
                         oneDriveError = nil
                         Task {
@@ -80,6 +82,8 @@ struct SettingsView: View {
                             }
                             isSigningIn = false
                         }
+                    } label: {
+                        Label(isSigningIn ? "Signing In…" : "Sign In", systemImage: "person.crop.circle.badge.plus")
                     }
                     .disabled(isSigningIn)
                 }
@@ -201,54 +205,33 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                Toggle("Pause Automatic Changes", isOn: $settings.isPaused)
-                    .help("Pauses only scheduled wallpaper changes. Manual “Change Wallpaper Now” still works.")
-
-                LabeledContent("Current photo") {
-                    let name = (settings.lastSetWallpaperItemName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    let id = (settings.lastSetWallpaperItemId ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    let display = name.isEmpty == false ? name : id
-                    Text(display.isEmpty ? "—" : display)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(display.isEmpty ? "No wallpaper has been set by GPhotoPaper yet." : display)
-                }
-
-                LabeledContent("Next change") {
-                    let hasAlbum = (settings.selectedAlbumId?.isEmpty == false)
+                let hasAlbum = (settings.selectedAlbumId?.isEmpty == false)
+                let canChangeNow = authService.isSignedIn && hasAlbum
+                Button {
+                    settings.isPaused.toggle()
                     if authService.isSignedIn == false {
-                        Text("Sign in")
-                            .foregroundStyle(.secondary)
-                    } else if hasAlbum == false {
-                        Text("Select an album")
-                            .foregroundStyle(.secondary)
+                        wallpaperManager.stopWallpaperUpdates()
                     } else if settings.isPaused {
-                        Text("Paused")
-                            .foregroundStyle(.secondary)
-                    } else if settings.changeFrequency == .never {
-                        Text("Off")
-                            .foregroundStyle(.secondary)
+                        wallpaperManager.stopWallpaperUpdates()
                     } else {
-                        let interval = WallpaperManager.intervalSeconds(for: settings.changeFrequency)
-                        let due = WallpaperManager.computeNextDueDate(
-                            now: Date(),
-                            lastSuccessfulWallpaperUpdate: settings.lastSuccessfulWallpaperUpdate,
-                            intervalSeconds: interval,
-                            hasSelectedAlbum: true,
-                            isPaused: false,
-                            lastAttemptDate: nil
-                        )
-                        if let due {
-                            Text(due, style: .relative)
-                                .foregroundStyle(.secondary)
-                                .help(due.formatted(date: .abbreviated, time: .shortened))
-                        } else {
-                            Text("—")
-                                .foregroundStyle(.secondary)
-                        }
+                        wallpaperManager.startWallpaperUpdates()
                     }
+                } label: {
+                    Label(
+                        settings.isPaused ? "Resume Automatic Changes" : "Pause Automatic Changes",
+                        systemImage: settings.isPaused ? "play.fill" : "pause.fill"
+                    )
                 }
+                .help("Pauses only scheduled wallpaper changes (the timer). Manual changes still work.")
+                .disabled(authService.isSignedIn == false)
+
+                Button {
+                    wallpaperManager.requestWallpaperUpdate(trigger: .manual)
+                } label: {
+                    Label(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now", systemImage: "sparkles")
+                }
+                .disabled(wallpaperManager.isUpdating || canChangeNow == false)
+                .help(canChangeNow ? "" : (authService.isSignedIn ? "Select an album to enable wallpaper changes." : "Sign in to enable wallpaper changes."))
 
                 Toggle("Pick Randomly", isOn: $settings.pickRandomly)
 
@@ -280,28 +263,6 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.menu)
-            }
-
-            Section {
-                let hasAlbum = (settings.selectedAlbumId?.isEmpty == false)
-                let canChangeNow = authService.isSignedIn && hasAlbum
-                Button(wallpaperManager.isUpdating ? "Changing…" : "Change Wallpaper Now") {
-                    wallpaperManager.requestWallpaperUpdate(trigger: .manual)
-                }
-                .disabled(wallpaperManager.isUpdating || canChangeNow == false)
-                .help(canChangeNow ? "" : (authService.isSignedIn ? "Select an album to enable wallpaper changes." : "Sign in to enable wallpaper changes."))
-
-                Button(settings.isPaused ? "Resume Automatic Changes" : "Pause Automatic Changes") {
-                    settings.isPaused.toggle()
-                }
-                .help("Pauses only scheduled wallpaper changes (the timer). Manual changes still work.")
-                .disabled(authService.isSignedIn == false)
-
-                if canChangeNow == false {
-                    Text(authService.isSignedIn ? "Select an album to enable changes." : "Sign in to enable changes.")
-                        .font(.system(.caption))
-                        .foregroundStyle(.secondary)
-                }
             }
 
             Section {
