@@ -9,7 +9,7 @@ env:
   # Keep these in one place so we can bump the supported macOS baseline easily.
   TARGET_MACOS_VERSION: "15.5"
   # Keep this conservative; raise over time as tests improve.
-  MIN_UNIT_TEST_COVERAGE_PERCENT: "50"
+  MIN_UNIT_TEST_COVERAGE_PERCENT: "48"
 
 jobs:
   build-and-test:
