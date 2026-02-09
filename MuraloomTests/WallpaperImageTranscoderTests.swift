@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import Testing
 import UniformTypeIdentifiers
-@testable import GPhotoPaper
+@testable import Muraloom
 
 struct WallpaperImageTranscoderTests {
     private func makeCGImage(width: Int, height: Int) -> CGImage {

@@ -15,7 +15,7 @@ enum OneDriveAuthError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "OneDrive auth is not configured. Set ONEDRIVE_CLIENT_ID (via GPhotoPaper/Secrets.xcconfig) and ensure OneDriveRedirectUri/OneDriveScopes are set in Info.plist."
+            return "OneDrive auth is not configured. Set ONEDRIVE_CLIENT_ID (via Muraloom/Secrets.xcconfig) and ensure OneDriveRedirectUri/OneDriveScopes are set in Info.plist."
         case .notSignedIn:
             return "Not signed in."
         case .cancelled:
@@ -473,7 +473,7 @@ private extension String {
 }
 
 private final class OneDriveTokenKeychain {
-    private let service = "lv.andr.GPhotoPaper.onedrive"
+    private let service = "lv.andr.muraloom.onedrive"
     private let account = "token"
 
     func load() -> OneDriveToken? {

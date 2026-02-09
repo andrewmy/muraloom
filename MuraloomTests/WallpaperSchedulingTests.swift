@@ -1,5 +1,5 @@
 import Testing
-@testable import GPhotoPaper
+@testable import Muraloom
 
 struct WallpaperSchedulingTests {
     @Test func pausedDisablesScheduling() {

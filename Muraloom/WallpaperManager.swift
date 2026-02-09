@@ -441,7 +441,7 @@ final class WallpaperManager: ObservableObject {
             appropriateFor: nil,
             create: true
         )
-        let appDir = baseDir.appendingPathComponent("GPhotoPaper", isDirectory: true)
+        let appDir = baseDir.appendingPathComponent("Muraloom", isDirectory: true)
         try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
         return appDir
     }

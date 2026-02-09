@@ -1,6 +1,6 @@
-# GPhotoPaper Project Plan
+# Muraloom Project Plan
 
-This document outlines the technical plan for GPhotoPaper, including the OneDrive/Graph integration, wallpaper pipeline, and release/distribution work.
+This document outlines the technical plan for Muraloom, including the OneDrive/Graph integration, wallpaper pipeline, and release/distribution work.
 
 ## Current status (repo)
 
@@ -10,13 +10,13 @@ This document outlines the technical plan for GPhotoPaper, including the OneDriv
   - `OneDriveAuthService`: **MSAL** wrapper (interactive sign-in, silent token acquisition, sign-out).
   - `OneDrivePhotosService`: Microsoft Graph v1.0 for **albums (bundle albums)** (list albums, verify album, fetch photos in an album).
   - Settings UI: sign-in + **album** selection (+ link to manage albums in OneDrive Photos).
-- CLI builds: `xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' ... build` succeeds when the environment has keychain/signing access.
+- CLI builds: `xcodebuild -scheme Muraloom -destination 'platform=macOS' ... build` succeeds when the environment has keychain/signing access.
 
 ## Distribution (GH Releases)
 
 - Target builds: **Apple silicon only** (`arm64`).
 - If RAW (LibRaw) support is enabled, the app links against Homebrew dylibs by default (e.g. `libraw`, plus transitive deps).
-  - For GitHub Releases, bundle required Homebrew dylibs into `GPhotoPaper.app/Contents/Frameworks` and rewrite load paths to `@rpath/...`.
+  - For GitHub Releases, bundle required Homebrew dylibs into `Muraloom.app/Contents/Frameworks` and rewrite load paths to `@rpath/...`.
   - The repo includes a local build helper: `just release-app`, which copies a Release `.app` into `build/release-app/` and bundles Homebrew dylibs.
 - Important compatibility check: ensure bundled dylibs are built for a minimum macOS version that matches the app’s deployment target.
   - Example: Homebrew dylibs built on newer macOS can have a higher `minos` (`LC_BUILD_VERSION`) than the app target, which will break on older macOS versions.
@@ -85,7 +85,7 @@ Current implementation uses the bundles endpoints and identifies “album-like�
   - Multiple accounts: decide whether to support now or later (MSAL makes this easier).
 - Update configuration:
   - Redirect URI uses `msauth.<bundle_id>://auth` (Azure portal iOS/macOS platform).
-  - Local dev client id via `GPhotoPaper/Secrets.xcconfig` (gitignored) → `ONEDRIVE_CLIENT_ID` → `OneDriveClientId` in `Info.plist`.
+  - Local dev client id via `Muraloom/Secrets.xcconfig` (gitignored) → `ONEDRIVE_CLIENT_ID` → `OneDriveClientId` in `Info.plist`.
   - Avoid passing reserved OIDC scopes to MSAL acquire-token calls (`openid`, `profile`, `offline_access`).
 - Keychain entitlement (macOS):
   - Ensure `keychain-access-groups` includes `$(AppIdentifierPrefix)com.microsoft.identity.universalstorage` (MSAL default cache group), otherwise you may hit OSStatus `-34018`.

@@ -229,7 +229,7 @@ let variants: [IconVariant] = [
     .init(pixels: 1024, filename: "AppIcon_512@2x.png", simplified: false),
 ]
 
-let outputDir = URL(fileURLWithPath: "GPhotoPaper/Assets.xcassets/AppIcon.appiconset", isDirectory: true)
+let outputDir = URL(fileURLWithPath: "Muraloom/Assets.xcassets/AppIcon.appiconset", isDirectory: true)
 var wroteAny = false
 for variant in variants {
     let png = renderPNG(pixels: variant.pixels, simplified: variant.simplified)

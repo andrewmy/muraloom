@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 @main
-struct GPhotoPaperApp: App {
+struct MuraloomApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var settings: SettingsModel
     @StateObject private var authService: AuthService
@@ -138,14 +138,14 @@ struct OneDriveAlbum: Codable {
 }
 
 enum AppEnvironment {
-    static let uiTestUserDefaultsSuiteName = "lv.andr.GPhotoPaper.uitests"
-    static let uiTestPhotosModeEnvironmentKey = "GPHOTOPAPER_UI_TEST_PHOTOS_MODE"
+    static let uiTestUserDefaultsSuiteName = "lv.andr.muraloom.uitests"
+    static let uiTestPhotosModeEnvironmentKey = "MURALOOM_UI_TEST_PHOTOS_MODE"
 
     static var isUITesting: Bool {
 #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-ui-testing") { return true }
-        if ProcessInfo.processInfo.environment["GPHOTOPAPER_UI_TESTING"] == "1" { return true }
+        if ProcessInfo.processInfo.environment["MURALOOM_UI_TESTING"] == "1" { return true }
         return false
 #else
         return false

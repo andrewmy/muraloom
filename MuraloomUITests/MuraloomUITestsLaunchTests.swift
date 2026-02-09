@@ -1,13 +1,13 @@
 //
-//  GPhotoPaperUITestsLaunchTests.swift
-//  GPhotoPaperUITests
+//  MuraloomUITestsLaunchTests.swift
+//  MuraloomUITests
 //
 //  Created by Andrejs MJ on 21/08/2025.
 //
 
 import XCTest
 
-final class GPhotoPaperUITestsLaunchTests: XCTestCase {
+final class MuraloomUITestsLaunchTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -17,7 +17,7 @@ final class GPhotoPaperUITestsLaunchTests: XCTestCase {
     func testLaunch() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing"]
-        app.launchEnvironment["GPHOTOPAPER_UI_TESTING"] = "1"
+        app.launchEnvironment["MURALOOM_UI_TESTING"] = "1"
         app.launch()
 
         // Insert steps here to perform after app launch but before taking a screenshot,

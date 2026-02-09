@@ -1,13 +1,13 @@
 //
-//  GPhotoPaperUITests.swift
-//  GPhotoPaperUITests
+//  MuraloomUITests.swift
+//  MuraloomUITests
 //
 //  Created by Andrejs MJ on 21/08/2025.
 //
 
 import XCTest
 
-final class GPhotoPaperUITests: XCTestCase {
+final class MuraloomUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -17,9 +17,9 @@ final class GPhotoPaperUITests: XCTestCase {
     private func makeApp(photosMode: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing"]
-        app.launchEnvironment["GPHOTOPAPER_UI_TESTING"] = "1"
+        app.launchEnvironment["MURALOOM_UI_TESTING"] = "1"
         if let photosMode {
-            app.launchEnvironment["GPHOTOPAPER_UI_TEST_PHOTOS_MODE"] = photosMode
+            app.launchEnvironment["MURALOOM_UI_TEST_PHOTOS_MODE"] = photosMode
         }
         return app
     }

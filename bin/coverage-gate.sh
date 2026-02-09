@@ -7,8 +7,8 @@ Usage:
   coverage-gate.sh <path-to.xcresult> [min_percent] [target_name]
 
 Examples:
-  coverage-gate.sh /tmp/tests.xcresult 20 GPhotoPaper
-  MIN_COVERAGE_PERCENT=15 coverage-gate.sh /tmp/tests.xcresult "" GPhotoPaper
+  coverage-gate.sh /tmp/tests.xcresult 20 Muraloom
+  MIN_COVERAGE_PERCENT=15 coverage-gate.sh /tmp/tests.xcresult "" Muraloom
 
 Notes:
   - Uses `xcrun xccov` to read coverage from an Xcode result bundle.
@@ -94,7 +94,7 @@ if target_name:
             break
 
     if match is None:
-        # As a last resort, accept a unique prefix match (e.g. "GPhotoPaper" -> "GPhotoPaper.app").
+        # As a last resort, accept a unique prefix match (e.g. "Muraloom" -> "Muraloom.app").
         prefix_matches = [
             t for t in targets
             if isinstance(t, dict)

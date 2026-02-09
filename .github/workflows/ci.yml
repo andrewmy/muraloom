@@ -71,10 +71,10 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild \
-            -scheme GPhotoPaper \
+            -scheme Muraloom \
             -destination 'platform=macOS' \
             -configuration Release \
-            -derivedDataPath /tmp/gphotopaper_deriveddata_release \
+            -derivedDataPath /tmp/muraloom_deriveddata_release \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
@@ -83,22 +83,22 @@ jobs:
             build
 
           mkdir -p build/ci
-          rm -rf build/ci/GPhotoPaper.app
-          ditto /tmp/gphotopaper_deriveddata_release/Build/Products/Release/GPhotoPaper.app build/ci/GPhotoPaper.app
+          rm -rf build/ci/Muraloom.app
+          ditto /tmp/muraloom_deriveddata_release/Build/Products/Release/Muraloom.app build/ci/Muraloom.app
 
       - name: Bundle Homebrew dylibs into app
         run: |
           set -euo pipefail
-          bash bin/bundle-homebrew-dylibs.sh build/ci/GPhotoPaper.app GPhotoPaper GPhotoPaper/GPhotoPaper.entitlements /opt/homebrew
+          bash bin/bundle-homebrew-dylibs.sh build/ci/Muraloom.app Muraloom Muraloom/Muraloom.entitlements /opt/homebrew
 
       - name: Verify no /opt/homebrew links remain
         run: |
           set -euo pipefail
-          if otool -L build/ci/GPhotoPaper.app/Contents/MacOS/GPhotoPaper | grep "/opt/homebrew"; then
+          if otool -L build/ci/Muraloom.app/Contents/MacOS/Muraloom | grep "/opt/homebrew"; then
             echo "ERROR: App still links against /opt/homebrew paths" >&2
             exit 1
           fi
-          if find build/ci/GPhotoPaper.app/Contents/Frameworks -maxdepth 1 -type f -name "*.dylib" -print0 | xargs -0 -n 1 otool -L | grep "/opt/homebrew"; then
+          if find build/ci/Muraloom.app/Contents/Frameworks -maxdepth 1 -type f -name "*.dylib" -print0 | xargs -0 -n 1 otool -L | grep "/opt/homebrew"; then
             echo "ERROR: Bundled dylib(s) still link against /opt/homebrew paths" >&2
             exit 1
           fi
@@ -107,8 +107,8 @@ jobs:
         run: |
           set -euo pipefail
           # It's OK if there are no dylibs (LibRaw optional), but if present they must be <= 15.5.
-          if ls -1 build/ci/GPhotoPaper.app/Contents/Frameworks/*.dylib >/dev/null 2>&1; then
-            bash bin/check-dylib-minos.sh "${TARGET_MACOS_VERSION}" build/ci/GPhotoPaper.app/Contents/Frameworks/*.dylib
+          if ls -1 build/ci/Muraloom.app/Contents/Frameworks/*.dylib >/dev/null 2>&1; then
+            bash bin/check-dylib-minos.sh "${TARGET_MACOS_VERSION}" build/ci/Muraloom.app/Contents/Frameworks/*.dylib
           else
             echo "No bundled dylibs found; skipping minos check"
           fi
@@ -117,37 +117,37 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild \
-            -scheme GPhotoPaper \
+            -scheme Muraloom \
             -destination 'platform=macOS' \
-            -derivedDataPath /tmp/gphotopaper_deriveddata_test \
-            -resultBundlePath /tmp/gphotopaper_tests.xcresult \
+            -derivedDataPath /tmp/muraloom_deriveddata_test \
+            -resultBundlePath /tmp/muraloom_tests.xcresult \
             -enableCodeCoverage YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             test \
-            -only-testing:GPhotoPaperTests
+            -only-testing:MuraloomTests
 
       - name: Coverage gate
         run: |
           set -euo pipefail
-          # Gate is unit-test-only; UI tests run separately and do not affect /tmp/gphotopaper_tests.xcresult.
-          bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult "${MIN_UNIT_TEST_COVERAGE_PERCENT}" GPhotoPaper
+          # Gate is unit-test-only; UI tests run separately and do not affect /tmp/muraloom_tests.xcresult.
+          bash bin/coverage-gate.sh /tmp/muraloom_tests.xcresult "${MIN_UNIT_TEST_COVERAGE_PERCENT}" Muraloom
 
       - name: UI tests (hermetic, ad-hoc signed)
         run: |
           set -euo pipefail
           # UI tests require a runnable test runner app. Ad-hoc sign it, but strip entitlements so this works without a dev cert.
           xcodebuild \
-            -scheme GPhotoPaper \
+            -scheme Muraloom \
             -destination 'platform=macOS' \
-            -derivedDataPath /tmp/gphotopaper_deriveddata_ui_test \
-            -resultBundlePath /tmp/gphotopaper_ui_tests.xcresult \
+            -derivedDataPath /tmp/muraloom_deriveddata_ui_test \
+            -resultBundlePath /tmp/muraloom_ui_tests.xcresult \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_ENTITLEMENTS="" \
             test \
-            -only-testing:GPhotoPaperUITests
+            -only-testing:MuraloomUITests
 
       - name: Upload xcresult bundles (on failure)
         if: failure()
@@ -155,18 +155,18 @@ jobs:
         with:
           name: xcresults
           path: |
-            /tmp/gphotopaper_tests.xcresult
-            /tmp/gphotopaper_ui_tests.xcresult
+            /tmp/muraloom_tests.xcresult
+            /tmp/muraloom_ui_tests.xcresult
 
       - name: Create distributable zip (for artifacts)
         run: |
           set -euo pipefail
           mkdir -p build/artifacts
-          rm -f build/artifacts/GPhotoPaper-Release-arm64.zip
-          ditto -c -k --sequesterRsrc --keepParent build/ci/GPhotoPaper.app build/artifacts/GPhotoPaper-Release-arm64.zip
+          rm -f build/artifacts/Muraloom-Release-arm64.zip
+          ditto -c -k --sequesterRsrc --keepParent build/ci/Muraloom.app build/artifacts/Muraloom-Release-arm64.zip
 
       - name: Upload Release app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GPhotoPaper-Release-arm64
-          path: build/artifacts/GPhotoPaper-Release-arm64.zip
+          name: Muraloom-Release-arm64
+          path: build/artifacts/Muraloom-Release-arm64.zip

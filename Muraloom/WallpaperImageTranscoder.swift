@@ -537,7 +537,7 @@ enum WallpaperImageTranscoder {
             }
 
             let dir = FileManager.default.temporaryDirectory
-            let url = dir.appendingPathComponent("gphotopaper-raw-\(UUID().uuidString).\(ext)")
+            let url = dir.appendingPathComponent("muraloom-raw-\(UUID().uuidString).\(ext)")
             do {
                 try data.write(to: url, options: [.atomic])
                 tempURL = url

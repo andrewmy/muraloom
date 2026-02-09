@@ -11,7 +11,7 @@
 ### Builds
 
 - CLI build:
-  - `xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata build`
+  - `xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata build`
 - Unit tests (local):
   - `just test`
 - Coverage gate (local, same as CI):
@@ -25,8 +25,8 @@
 
 ### UI tests (hermetic / non-flaky)
 
-- UI tests run the app in a fixture mode (no interactive MSAL sign-in, no Microsoft Graph calls) by launching with `-ui-testing` + `GPHOTOPAPER_UI_TESTING=1`.
-- Configure fixture behavior via `GPHOTOPAPER_UI_TEST_PHOTOS_MODE` (e.g. `listAlbumsFailOnce` to simulate a reload error that recovers on retry).
+- UI tests run the app in a fixture mode (no interactive MSAL sign-in, no Microsoft Graph calls) by launching with `-ui-testing` + `MURALOOM_UI_TESTING=1`.
+- Configure fixture behavior via `MURALOOM_UI_TEST_PHOTOS_MODE` (e.g. `listAlbumsFailOnce` to simulate a reload error that recovers on retry).
 - Prefer in-app harnesses over system UI automation when needed:
   - Menu bar actions are exercised via an in-window “Menu Bar (UI testing)” harness shown under Advanced in UI testing mode (system status bar UI is flaky/unreliable in XCUITest).
 - Avoid tests that change global macOS state (e.g. appearance/theme). Xcode can prompt to run UI tests under multiple UI configurations; that can leave the system in Dark/Light if interrupted.

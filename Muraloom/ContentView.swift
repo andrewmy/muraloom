@@ -8,7 +8,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("GPhotoPaper")
+            Text("Muraloom")
                 .font(.largeTitle)
                 .accessibilityIdentifier("app.title")
 

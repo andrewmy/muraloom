@@ -11,7 +11,7 @@ and fails if any file requires a macOS version greater than <max_macos_version>.
 
 Examples:
   bin/check-dylib-minos.sh 15.5 /opt/homebrew/opt/libraw/lib/libraw*.dylib
-  bin/check-dylib-minos.sh 15.5 build/ci/GPhotoPaper.app/Contents/Frameworks/*.dylib
+  bin/check-dylib-minos.sh 15.5 build/ci/Muraloom.app/Contents/Frameworks/*.dylib
 
 Notes:
   - Prefers LC_BUILD_VERSION minos; falls back to LC_VERSION_MIN_MACOSX "version".

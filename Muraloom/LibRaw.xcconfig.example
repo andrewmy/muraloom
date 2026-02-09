@@ -1,8 +1,8 @@
 // Optional local build settings to enable LibRaw-based RAW decoding (ARW/DNG/etc).
 //
 // Usage:
-// 1) Copy this file to `GPhotoPaper/LibRaw.xcconfig` (gitignored), then tweak paths/flags.
-// 2) Ensure `GPhotoPaper/Config.xcconfig` includes it via `#include?`.
+// 1) Copy this file to `Muraloom/LibRaw.xcconfig` (gitignored), then tweak paths/flags.
+// 2) Ensure `Muraloom/Config.xcconfig` includes it via `#include?`.
 //
 // Notes:
 // - Prefer linking LibRaw statically (or via an XCFramework) for the least hassle with signing/notarization.

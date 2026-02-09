@@ -1,5 +1,5 @@
 import Testing
-@testable import GPhotoPaper
+@testable import Muraloom
 
 struct WallpaperCandidateSelectionTests {
     private func item(_ id: String, _ name: String) -> MediaItem {

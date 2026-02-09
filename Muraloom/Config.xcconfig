@@ -6,10 +6,10 @@ ONEDRIVE_CLIENT_ID = YOUR_ONEDRIVE_CLIENT_ID
 
 // Optional overrides (gitignored):
 // Copy `Secrets.xcconfig.example` -> `Secrets.xcconfig` and fill in values.
-#include? "GPhotoPaper/Secrets.xcconfig"
+#include? "Muraloom/Secrets.xcconfig"
 #include? "Secrets.xcconfig"
 
 // Optional LibRaw RAW decoding (gitignored):
 // Copy `LibRaw.xcconfig.example` -> `LibRaw.xcconfig` and fill in values.
-#include? "GPhotoPaper/LibRaw.xcconfig"
+#include? "Muraloom/LibRaw.xcconfig"
 #include? "LibRaw.xcconfig"

@@ -21,7 +21,7 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         Image(systemName: symbolName)
-            .accessibilityLabel("GPhotoPaper")
+            .accessibilityLabel("Muraloom")
             .accessibilityIdentifier("menubar.statusItem")
     }
 }
@@ -235,7 +235,7 @@ struct MenuBarMenuView: View {
             Button {
                 NSApp.terminate(nil)
             } label: {
-                Label("Quit GPhotoPaper", systemImage: "power")
+                Label("Quit Muraloom", systemImage: "power")
             }
             .accessibilityIdentifier("menubar.quit")
         }

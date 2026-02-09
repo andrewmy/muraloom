@@ -4,7 +4,7 @@
 <dict>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)lv.andr.GPhotoPaper</string>
+		<string>$(AppIdentifierPrefix)lv.andr.muraloom</string>
 		<string>$(AppIdentifierPrefix)com.microsoft.identity.universalstorage</string>
 	</array>
 </dict>

@@ -1,15 +1,15 @@
 //
-//  GPhotoPaperTests.swift
-//  GPhotoPaperTests
+//  MuraloomTests.swift
+//  MuraloomTests
 //
 //  Created by Andrejs MJ on 21/08/2025.
 //
 
 import Testing
 import Foundation
-@testable import GPhotoPaper
+@testable import Muraloom
 
-struct GPhotoPaperTests {
+struct MuraloomTests {
     final class TestTokenProvider: OneDriveAccessTokenProviding {
         func validAccessToken() async throws -> String { "test-token" }
     }

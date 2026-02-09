@@ -4,7 +4,7 @@
 
 Many camera RAW formats (ARW, DNG, CR2, NEF, …) are *not* reliably decodable/resizable with the macOS ImageIO thumbnail APIs. In practice this can lead to “solid color” fallback wallpapers or repeated decode errors when the album contains RAW files.
 
-GPhotoPaper’s wallpaper pipeline expects to write a **real JPEG** to disk before calling `NSWorkspace.setDesktopImageURL`. For RAW photos we need a reliable RAW → RGB → JPEG converter.
+Muraloom’s wallpaper pipeline expects to write a **real JPEG** to disk before calling `NSWorkspace.setDesktopImageURL`. For RAW photos we need a reliable RAW → RGB → JPEG converter.
 
 ## Why LibRaw is the “least hassle” choice
 
@@ -25,7 +25,7 @@ LibRaw is relatively small, focused (camera RAW decode), and can be shipped as a
 - `brew install libraw`
 
 2) Create a local xcconfig (gitignored):
-- Copy `GPhotoPaper/LibRaw.xcconfig.example` → `GPhotoPaper/LibRaw.xcconfig`
+- Copy `Muraloom/LibRaw.xcconfig.example` → `Muraloom/LibRaw.xcconfig`
 - Ensure `HEADER_SEARCH_PATHS`, `LIBRARY_SEARCH_PATHS`, and `OTHER_LDFLAGS` match your system.
 
 3) Build and run.
@@ -58,7 +58,7 @@ Ship LibRaw **statically** (or as a static `.xcframework`) and link it into the 
 ### If you ship a dynamic library anyway
 
 You must:
-- Embed the `.dylib`/`.framework` inside `GPhotoPaper.app/Contents/Frameworks`.
+- Embed the `.dylib`/`.framework` inside `Muraloom.app/Contents/Frameworks`.
 - Ensure install names/rpaths are correct (so the app loads the embedded copy, not `/opt/homebrew/...`).
 - Codesign the embedded libraries and the app with the same identity.
 

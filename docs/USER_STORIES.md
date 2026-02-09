@@ -1,4 +1,4 @@
-# GPhotoPaper User Stories
+# Muraloom User Stories
 
 This document outlines the user stories for the application, categorized into MVP (Minimum Viable Product) and Post-MVP features.
 

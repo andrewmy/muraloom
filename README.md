@@ -1,6 +1,6 @@
-# GPhotoPaper
+# Muraloom
 
-GPhotoPaper is a macOS app that automatically changes your desktop wallpaper using photos from a OneDrive album.
+Muraloom is a macOS app that automatically changes your desktop wallpaper using photos from a OneDrive album.
 
 ## Features
 
@@ -25,20 +25,20 @@ You’ll need to:
 
 1. Create an app registration in the Azure portal: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
 2. Set supported account types to include **personal Microsoft accounts**.
-3. Add an **iOS/macOS** redirect URI that matches `OneDriveRedirectUri` in `GPhotoPaper/Info.plist`.
+3. Add an **iOS/macOS** redirect URI that matches `OneDriveRedirectUri` in `Muraloom/Info.plist`.
    - Azure will generate the redirect URI in the format `msauth.<bundle_id>://auth`.
 4. Add delegated Microsoft Graph permissions:
    - `User.Read`
    - `Files.Read`
 5. Provide your **Application (client) ID** to the app (don’t commit secrets):
-   - Copy `GPhotoPaper/Secrets.xcconfig.example` to `GPhotoPaper/Secrets.xcconfig` (gitignored).
-   - Set `ONEDRIVE_CLIENT_ID = ...` in `GPhotoPaper/Secrets.xcconfig`.
+   - Copy `Muraloom/Secrets.xcconfig.example` to `Muraloom/Secrets.xcconfig` (gitignored).
+   - Set `ONEDRIVE_CLIENT_ID = ...` in `Muraloom/Secrets.xcconfig`.
 
 ### Troubleshooting
 
 If clicking “Sign In” shows **“OneDrive auth is not configured”**, it means the app is still using placeholder values.
 
-- Ensure `GPhotoPaper/Secrets.xcconfig` exists and contains `ONEDRIVE_CLIENT_ID = ...` (this is used by `GPhotoPaper/Info.plist` via `$(ONEDRIVE_CLIENT_ID)`).
+- Ensure `Muraloom/Secrets.xcconfig` exists and contains `ONEDRIVE_CLIENT_ID = ...` (this is used by `Muraloom/Info.plist` via `$(ONEDRIVE_CLIENT_ID)`).
 - Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
 - Verify `OneDriveScopes` is a space-separated list (e.g. `User.Read Files.Read`).
   - Note: `openid`, `profile`, and `offline_access` are reserved OIDC scopes. MSAL handles these automatically, so don’t include them here.
@@ -48,28 +48,28 @@ If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL f
 - Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
 - Verify your app bundle identifier (Xcode target → **Signing & Capabilities** → **Bundle Identifier**) matches the `<bundle_id>` you entered in the Azure portal.
 - If you changed bundle ID / redirect settings recently, try **Product → Clean Build Folder** in Xcode and run again.
-- If the underlying error is **OSStatus -34018**, it usually means the app is missing a required Keychain entitlement. Ensure the `GPhotoPaper` target’s entitlements include MSAL’s default macOS cache group (`$(AppIdentifierPrefix)com.microsoft.identity.universalstorage`) and that the app is run as a signed build from Xcode.
+- If the underlying error is **OSStatus -34018**, it usually means the app is missing a required Keychain entitlement. Ensure the `Muraloom` target’s entitlements include MSAL’s default macOS cache group (`$(AppIdentifierPrefix)com.microsoft.identity.universalstorage`) and that the app is run as a signed build from Xcode.
 
-If you downloaded `GPhotoPaper.app` and macOS refuses to open it, remove the quarantine attribute and try again:
+If you downloaded `Muraloom.app` and macOS refuses to open it, remove the quarantine attribute and try again:
 
 ```bash
-xattr -dr com.apple.quarantine /path/to/GPhotoPaper.app
-open /path/to/GPhotoPaper.app
+xattr -dr com.apple.quarantine /path/to/Muraloom.app
+open /path/to/Muraloom.app
 ```
 
 ### Xcode Setup
 
 1.  Clone this repository:
     ```bash
-    git clone https://github.com/andrewmy/GPhotoPaper.git
-    cd GPhotoPaper
+    git clone https://github.com/andrewmy/muraloom.git
+    cd muraloom
     ```
-2.  Open the `GPhotoPaper.xcodeproj` file in Xcode.
-3.  In Xcode, select the `GPhotoPaper` target in the project navigator.
+2.  Open the `Muraloom.xcodeproj` file in Xcode.
+3.  In Xcode, select the `Muraloom` target in the project navigator.
 4.  Go to the "Signing & Capabilities" tab.
 5.  Change the "Team" to your development team.
-6.  Change the "Bundle Identifier" to a unique identifier (e.g., `com.yourcompany.GPhotoPaper`).
-7.  Ensure the URL scheme in `GPhotoPaper/Info.plist` matches the scheme used by your redirect URI (default scheme: `msauth.<bundle_id>`).
+6.  Change the "Bundle Identifier" to a unique identifier (e.g., `com.yourcompany.Muraloom`).
+7.  Ensure the URL scheme in `Muraloom/Info.plist` matches the scheme used by your redirect URI (default scheme: `msauth.<bundle_id>`).
 
 ### Build and Run
 
@@ -83,47 +83,47 @@ The application should now build and run on your macOS device.
 Build (Debug):
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata build
+xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata build
 ```
 
 If you only need a compile sanity check (and want to avoid signing/keychain issues):
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata CODE_SIGNING_ALLOWED=NO build
+xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata CODE_SIGNING_ALLOWED=NO build
 ```
 
 Run the built app (requires a signed build; `CODE_SIGNING_ALLOWED=NO` won’t produce a runnable app):
 
 ```bash
-open /tmp/gphotopaper_deriveddata/Build/Products/Debug/GPhotoPaper.app
+open /tmp/muraloom_deriveddata/Build/Products/Debug/Muraloom.app
 ```
 
 Run tests from CLI:
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata test
+xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata test
 ```
 
 Run only unit tests:
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata_test test -only-testing:GPhotoPaperTests
+xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata_test test -only-testing:MuraloomTests
 ```
 
 Run unit tests with code coverage (and produce an `.xcresult` bundle you can inspect in Xcode):
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata_test -resultBundlePath /tmp/gphotopaper_tests.xcresult -enableCodeCoverage YES test -only-testing:GPhotoPaperTests
-bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult 50 GPhotoPaper
+xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata_test -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES test -only-testing:MuraloomTests
+bash bin/coverage-gate.sh /tmp/muraloom_tests.xcresult 50 Muraloom
 ```
 
-CI enforces this as a gate (unit tests only): `GPhotoPaper.app` line coverage must be at least 50%.
+CI enforces this as a gate (unit tests only): `Muraloom.app` line coverage must be at least 50%.
 To run the same gate locally, use `just coverage` (or `just coverage-report` for a report without enforcing a minimum).
 
 Run only UI tests (hermetic; no network/auth required):
 
 ```bash
-xcodebuild -scheme GPhotoPaper -destination 'platform=macOS' -derivedDataPath /tmp/gphotopaper_deriveddata_ui_test -resultBundlePath /tmp/gphotopaper_ui_tests.xcresult CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="-" CODE_SIGN_ENTITLEMENTS="" test -only-testing:GPhotoPaperUITests
+xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/muraloom_deriveddata_ui_test -resultBundlePath /tmp/muraloom_ui_tests.xcresult CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="-" CODE_SIGN_ENTITLEMENTS="" test -only-testing:MuraloomUITests
 ```
 
 Convenience `just` recipes:

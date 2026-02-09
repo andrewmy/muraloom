@@ -1,18 +1,18 @@
-derived_data := "/tmp/gphotopaper_deriveddata_release"
-derived_data_debug := "/tmp/gphotopaper_deriveddata_debug"
-derived_data_test := "/tmp/gphotopaper_deriveddata_test"
-derived_data_ui_test := "/tmp/gphotopaper_deriveddata_ui_test"
+derived_data := "/tmp/muraloom_deriveddata_release"
+derived_data_debug := "/tmp/muraloom_deriveddata_debug"
+derived_data_test := "/tmp/muraloom_deriveddata_test"
+derived_data_ui_test := "/tmp/muraloom_deriveddata_ui_test"
 min_unit_test_coverage_percent := "50"
 out_dir := "build/release-app"
 out_dir_debug := "build/debug-app"
-app_name := "GPhotoPaper.app"
-app_binary := "GPhotoPaper"
-scheme := "GPhotoPaper"
+app_name := "Muraloom.app"
+app_binary := "Muraloom"
+scheme := "Muraloom"
 destination := "platform=macOS"
 configuration := "Release"
 configuration_debug := "Debug"
-ui_test_target := "GPhotoPaperUITests"
-entitlements := "GPhotoPaper/GPhotoPaper.entitlements"
+ui_test_target := "MuraloomUITests"
+entitlements := "Muraloom/Muraloom.entitlements"
 
 build_archs := "arm64"
 only_active_arch := "YES"
@@ -45,15 +45,15 @@ test:
 
 # Run unit tests with code coverage and enforce CI's minimum.
 coverage:
-  rm -rf /tmp/gphotopaper_tests.xcresult
-  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/gphotopaper_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:GPhotoPaperTests
-  bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult {{min_unit_test_coverage_percent}} {{scheme}}
+  rm -rf /tmp/muraloom_tests.xcresult
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:MuraloomTests
+  bash bin/coverage-gate.sh /tmp/muraloom_tests.xcresult {{min_unit_test_coverage_percent}} {{scheme}}
 
 # Run unit tests with code coverage and print the coverage report (no minimum enforced).
 coverage-report:
-  rm -rf /tmp/gphotopaper_tests.xcresult
-  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/gphotopaper_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:GPhotoPaperTests
-  bash bin/coverage-gate.sh /tmp/gphotopaper_tests.xcresult 0 {{scheme}}
+  rm -rf /tmp/muraloom_tests.xcresult
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:MuraloomTests
+  bash bin/coverage-gate.sh /tmp/muraloom_tests.xcresult 0 {{scheme}}
 
 # Run UI tests (uses a hermetic in-app UI testing mode; no network/auth required).
 ui-test:
