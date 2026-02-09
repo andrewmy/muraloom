@@ -303,7 +303,7 @@ struct SettingsView: View {
                                 Text("Menu Bar (UI testing)")
                                     .font(.system(.subheadline, weight: .semibold))
 
-                                MenuBarMenuView()
+                                UItestingMenuBarHarness()
                             }
 
                             Divider()

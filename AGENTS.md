@@ -61,6 +61,7 @@
 - Avoid sprinkling `AppEnvironment.isUITesting` across the codebase; keep UI-test branching in the composition root and inject fixture implementations instead.
 - Prefer concise errors and minimal UI state in views.
 - When making behavioral changes, **add or update unit tests** to cover them whenever practical.
+- **Do NOT run `git commit` or `git push` unless explicitly asked** by the user.
 
 ### Persistence (UserDefaults)
 
