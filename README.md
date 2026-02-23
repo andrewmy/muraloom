@@ -50,7 +50,12 @@ If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL f
 - Verify your app bundle identifier (Xcode target → **Signing & Capabilities** → **Bundle Identifier**) matches the `<bundle_id>` you entered in the Azure portal.
 - If you changed bundle ID / redirect settings recently, try **Product → Clean Build Folder** in Xcode and run again.
 - If the underlying error is **OSStatus -34018**, it usually means keychain access is unavailable for that build. Build/run from Xcode with your Team set and **Automatically manage signing** enabled.
-- CI release artifacts are ad-hoc signed for portability, but sign-in behavior is still most reliable in a normal signed Xcode build.
+- CI release artifacts are ad-hoc signed by default. If signing secrets are configured, CI uses Developer ID signing, which is better for cross-machine auth testing.
+- To produce CI artifacts that are more likely to sign in on another machine, configure these GitHub secrets so CI can Developer ID-sign the app:
+  - `APPLE_TEAM_ID` (10-char Team ID, e.g. `ABCDE12345`)
+  - `APPLE_SIGNING_IDENTITY` (full identity, e.g. `Developer ID Application: Your Name (ABCDE12345)`)
+  - `APPLE_SIGNING_CERT_P12_BASE64` (base64 of exported `.p12` certificate)
+  - `APPLE_SIGNING_CERT_PASSWORD` (password used for that `.p12`)
 
 If you downloaded `Muraloom.app` and macOS refuses to open it, remove the quarantine attribute and try again:
 
