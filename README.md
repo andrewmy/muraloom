@@ -49,7 +49,8 @@ If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL f
 - Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
 - Verify your app bundle identifier (Xcode target → **Signing & Capabilities** → **Bundle Identifier**) matches the `<bundle_id>` you entered in the Azure portal.
 - If you changed bundle ID / redirect settings recently, try **Product → Clean Build Folder** in Xcode and run again.
-- If the underlying error is **OSStatus -34018**, it usually means the app is missing a required Keychain entitlement. Ensure the `Muraloom` target’s entitlements include MSAL’s default macOS cache group (`$(AppIdentifierPrefix)com.microsoft.identity.universalstorage`) and that the app is run as a signed build from Xcode.
+- If the underlying error is **OSStatus -34018**, it usually means keychain access is unavailable for that build. Build/run from Xcode with your Team set and **Automatically manage signing** enabled.
+- CI release artifacts are ad-hoc signed for portability, but sign-in behavior is still most reliable in a normal signed Xcode build.
 
 If you downloaded `Muraloom.app` and macOS refuses to open it, remove the quarantine attribute and try again:
 

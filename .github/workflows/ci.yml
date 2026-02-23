@@ -147,6 +147,16 @@ jobs:
             echo "No bundled dylibs found; skipping minos check"
           fi
 
+      - name: Ad-hoc sign release app artifact
+        run: |
+          set -euo pipefail
+          codesign --force --deep --sign - build/ci/Muraloom.app
+
+      - name: Verify release app signature
+        run: |
+          set -euo pipefail
+          codesign --verify --deep --strict build/ci/Muraloom.app
+
       - name: Unit tests + coverage (no UI tests, no signing)
         run: |
           set -euo pipefail

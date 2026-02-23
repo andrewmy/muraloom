@@ -2,7 +2,7 @@ import Combine
 import Foundation
 
 enum OneDriveAuthError: Error, LocalizedError {
-    case notConfigured
+    case notConfigured(details: String)
     case notSignedIn
     case cancelled
     case msalError(details: String)
@@ -14,20 +14,22 @@ enum OneDriveAuthError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notConfigured:
-            return "OneDrive auth is not configured. Set ONEDRIVE_CLIENT_ID (via Muraloom/Secrets.xcconfig) and ensure OneDriveRedirectUri/OneDriveScopes are set in Info.plist."
+        case .notConfigured(let details):
+            return """
+            OneDrive auth is not configured. Set ONEDRIVE_CLIENT_ID (via Muraloom/Secrets.xcconfig) and ensure OneDriveRedirectUri/OneDriveScopes are set in Info.plist. Details: \(details)
+            """
         case .notSignedIn:
             return "Not signed in."
         case .cancelled:
             return "Sign-in cancelled."
         case .msalError(let details):
             if details.isEmpty { return "OneDrive sign-in failed." }
-            return "OneDrive sign-in failed: \(details)"
+            return Self.withAuthSetupHintIfNeeded(base: "OneDrive sign-in failed: \(details)", details: details)
         case .msalInitializationFailed(let underlying):
             if underlying.isEmpty {
                 return "OneDrive auth setup failed."
             }
-            return "OneDrive auth setup failed: \(underlying)"
+            return Self.withAuthSetupHintIfNeeded(base: "OneDrive auth setup failed: \(underlying)", details: underlying)
         case .invalidRedirectURL:
             return "Invalid redirect URL."
         case .missingAuthorizationCode:
@@ -37,6 +39,20 @@ enum OneDriveAuthError: Error, LocalizedError {
         case .httpError(let status, _):
             return "HTTP \(status)."
         }
+    }
+
+    private static func withAuthSetupHintIfNeeded(base: String, details: String) -> String {
+        guard looksLikeMissingKeychainEntitlement(details) else {
+            return base
+        }
+        return """
+        \(base) This usually means keychain access is unavailable for this build (OSStatus -34018). Build and run from Xcode with Team + Automatically manage signing.
+        """
+    }
+
+    private static func looksLikeMissingKeychainEntitlement(_ details: String) -> Bool {
+        details.contains("-34018")
+            || details.localizedCaseInsensitiveContains("errSecMissingEntitlement")
     }
 }
 
@@ -63,6 +79,11 @@ final class OneDriveAuthService: AuthService {
                 redirectUri: config.redirectUri,
                 authority: authority
             )
+            // Use a private cache group so auth works even when shared keychain entitlements
+            // are unavailable in unsigned/CI artifacts.
+            if let bundleIdentifier = Bundle.main.bundleIdentifier, !bundleIdentifier.isEmpty {
+                msalConfig.cacheConfig.keychainSharingGroup = bundleIdentifier
+            }
             let app = try MSALPublicClientApplication(configuration: msalConfig)
             self.application = app
             self.currentAccount = try app.allAccounts().first
@@ -121,12 +142,14 @@ final class OneDriveAuthService: AuthService {
     }
 
     private func ensureApplication() throws -> MSALPublicClientApplication {
-        guard config.isConfigured else { throw OneDriveAuthError.notConfigured }
+        guard config.isConfigured else {
+            throw OneDriveAuthError.notConfigured(details: config.configurationStatusSummary)
+        }
         if let application { return application }
         if let applicationInitError {
             throw OneDriveAuthError.msalInitializationFailed(underlying: Self.describeMSALError(applicationInitError))
         }
-        throw OneDriveAuthError.notConfigured
+        throw OneDriveAuthError.notConfigured(details: config.configurationStatusSummary)
     }
 
     private func ensureAccount(application: MSALPublicClientApplication) throws -> MSALAccount {
@@ -269,7 +292,9 @@ final class OneDriveAuthService: AuthService {
     }
 
     override func signIn() async throws {
-        guard config.isConfigured else { throw OneDriveAuthError.notConfigured }
+        guard config.isConfigured else {
+            throw OneDriveAuthError.notConfigured(details: config.configurationStatusSummary)
+        }
 
         let pkce = PKCE()
         let state = UUID().uuidString
@@ -287,7 +312,9 @@ final class OneDriveAuthService: AuthService {
             .init(name: "prompt", value: "select_account"),
         ]
 
-        guard let url = components.url else { throw OneDriveAuthError.notConfigured }
+        guard let url = components.url else {
+            throw OneDriveAuthError.notConfigured(details: config.configurationStatusSummary)
+        }
 
         let callbackScheme = URL(string: config.redirectUri)?.scheme
         let redirectURL = try await startWebAuthSession(url: url, callbackScheme: callbackScheme)
