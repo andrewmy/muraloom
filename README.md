@@ -144,6 +144,8 @@ just ui-test   # UI tests
 just test-all  # unit + UI tests
 ```
 
+`just release-app` also bundles Homebrew dylibs (e.g. LibRaw dependencies), ad-hoc signs for portability, and prints the binary architecture(s).
+
 UI tests (Debug builds) launch the app with `-ui-testing` to use local fixture services (no interactive sign-in, no Graph calls). In UI testing mode, Advanced also shows a small “Menu Bar (UI testing)” harness so menu actions can be tested without relying on the system status bar UI.
 On macOS, Xcode UI tests may also prompt to close other running apps (“Remove Other Apps”) to improve reliability.
 

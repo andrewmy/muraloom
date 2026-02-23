@@ -28,6 +28,8 @@ release-app:
   rm -f {{out_dir}}/Muraloom-signed.zip
   xcodebuild -scheme {{scheme}} -destination '{{destination}}' -configuration {{configuration}} -derivedDataPath {{derived_data}} ARCHS={{build_archs}} ONLY_ACTIVE_ARCH={{only_active_arch}} build
   ditto {{derived_data}}/Build/Products/{{configuration}}/{{app_name}} {{out_dir}}/{{app_name}}
+  CODESIGN_IDENTITY="-" {{bundle_script}} {{out_dir}}/{{app_name}} {{app_binary}} {{entitlements}} {{bundle_homebrew_prefix}}
+  @echo "Binary architectures: $$(lipo -archs {{out_dir}}/{{app_name}}/Contents/MacOS/{{app_binary}})"
   codesign --verify --deep --strict {{out_dir}}/{{app_name}}
   ditto -c -k --sequesterRsrc --keepParent {{out_dir}}/{{app_name}} {{out_dir}}/Muraloom-signed.zip
   @echo "Built {{out_dir}}/{{app_name}}"
