@@ -13,7 +13,7 @@ struct OneDriveConfig {
         self.redirectUri = bundle.object(forInfoDictionaryKey: "OneDriveRedirectUri") as? String ?? ""
         let scopesString = bundle.object(forInfoDictionaryKey: "OneDriveScopes") as? String ?? ""
         self.rawScopes = scopesString
-        self.scopes = scopesString.split(separator: " ").map(String.init)
+        self.scopes = Self.normalizedScopes(from: scopesString)
         self.authorityHost = bundle.object(forInfoDictionaryKey: "OneDriveAuthorityHost") as? String ?? "login.microsoftonline.com"
         self.tenant = bundle.object(forInfoDictionaryKey: "OneDriveTenant") as? String ?? "common"
     }
@@ -67,8 +67,17 @@ struct OneDriveConfig {
         URL(string: "https://\(authorityHost)/\(tenant)")!
     }
 
-    var msalScopes: [String] {
-        let reserved = Set(["openid", "profile", "offline_access"])
-        return scopes.filter { !reserved.contains($0) }
+    private static func normalizedScopes(from raw: String) -> [String] {
+        let requested = raw.split(separator: " ").map(String.init)
+        let required = ["offline_access"]
+
+        var seen = Set<String>()
+        var result: [String] = []
+        for scope in requested + required {
+            let key = scope.lowercased()
+            guard seen.insert(key).inserted else { continue }
+            result.append(scope)
+        }
+        return result
     }
 }

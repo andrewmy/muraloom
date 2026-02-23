@@ -5,7 +5,7 @@
 - Target integration is **OneDrive** (Microsoft Graph) for **personal Microsoft accounts**.
 - Source of truth for roadmap/decisions: `docs/PROJECT_PLAN.md`.
 - Locked-in direction:
-  - Auth: **MSAL**
+  - Auth: **native OAuth** (`ASWebAuthenticationSession` + PKCE)
   - Wallpaper source: **OneDrive Albums** (Graph bundle albums), not folders
 
 ### Builds
@@ -25,7 +25,7 @@
 
 ### UI tests (hermetic / non-flaky)
 
-- UI tests run the app in a fixture mode (no interactive MSAL sign-in, no Microsoft Graph calls) by launching with `-ui-testing` + `MURALOOM_UI_TESTING=1`.
+- UI tests run the app in a fixture mode (no interactive sign-in, no Microsoft Graph calls) by launching with `-ui-testing` + `MURALOOM_UI_TESTING=1`.
 - Configure fixture behavior via `MURALOOM_UI_TEST_PHOTOS_MODE` (e.g. `listAlbumsFailOnce` to simulate a reload error that recovers on retry).
 - Prefer in-app harnesses over system UI automation when needed:
   - Menu bar actions are exercised via an in-window “Menu Bar (UI testing)” harness shown under Advanced in UI testing mode (system status bar UI is flaky/unreliable in XCUITest).
@@ -34,7 +34,7 @@
 
 ### Current implementation status
 
-- Present today (working): **MSAL** auth + **album-based** Graph fetching (bundle albums via `/drive/bundles`).
+- Present today (working): native OAuth auth + **album-based** Graph fetching (bundle albums via `/drive/bundles`).
 - Notes:
   - For some personal accounts, `$filter=bundle/album ne null` can return 0 even when albums exist in OneDrive Photos.
   - The app treats `photos.onedrive.com` bundle URLs as albums (and uses `bundle.album` when available).
@@ -48,18 +48,18 @@
 
 ### Config & scopes (today)
 
-- `Info.plist` keys used by the current MSAL path:
+- `Info.plist` keys used by the current auth path:
   - `OneDriveClientId`, `OneDriveRedirectUri`, `OneDriveScopes`
 - Default read-only scope set for wallpaper fetching:
-  - `User.Read Files.Read` (MSAL handles reserved OIDC scopes like `openid`, `profile`, `offline_access`)
+  - `User.Read Files.Read`
 - Only add `Files.ReadWrite` if/when implementing album creation or adding/removing items via the app.
-- MSAL token cache entitlement (macOS): ensure `keychain-access-groups` includes `$(AppIdentifierPrefix)com.microsoft.identity.universalstorage` (or you may hit OSStatus `-34018`).
 
 ### Code style
 
 - Keep services behind protocols where it helps testability (`PhotosService`).
 - Avoid sprinkling `AppEnvironment.isUITesting` across the codebase; keep UI-test branching in the composition root and inject fixture implementations instead.
 - Prefer concise errors and minimal UI state in views.
+- For bug fixes, prefer red-green: add a failing test first when practical, then patch and verify it passes.
 - When making behavioral changes, **add or update unit tests** to cover them whenever practical.
 - **Do NOT run `git commit` or `git push` unless explicitly asked** by the user.
 
@@ -75,7 +75,7 @@
 - The app is a normal Dock app; the menu bar icon is supplemental for quick actions and status.
 - The settings window is the main `WindowGroup` and is opened/foregrounded via `openWindow(id: "settings")`.
 - Ensure the app keeps running after closing the settings window (menu bar icon must remain usable).
-- For interactive sign-in launched from the menu bar, open/activate the settings window first so MSAL has a presentation context.
+- For interactive sign-in launched from the menu bar, open/activate the settings window first so the web auth session has a presentation context.
 - “Pause” means pause **scheduled/timer-driven** changes only (manual “Change Now” still works).
 
 ### Context

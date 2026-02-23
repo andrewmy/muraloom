@@ -1,15 +1,22 @@
-import Combine
+import AppKit
+import AuthenticationServices
+import CryptoKit
 import Foundation
+import Security
+
+func oneDriveAuthLooksLikeMissingEntitlement(_ details: String) -> Bool {
+    details.contains("-34018")
+        || details.localizedCaseInsensitiveContains("errSecMissingEntitlement")
+}
 
 enum OneDriveAuthError: Error, LocalizedError {
     case notConfigured(details: String)
     case notSignedIn
     case cancelled
-    case msalError(details: String)
-    case msalInitializationFailed(underlying: String)
+    case providerError(details: String)
     case invalidRedirectURL
     case missingAuthorizationCode
-    case tokenResponseMissingFields
+    case tokenResponseMissingFields(details: String)
     case httpError(status: Int, body: String)
 
     var errorDescription: String? {
@@ -22,243 +29,41 @@ enum OneDriveAuthError: Error, LocalizedError {
             return "Not signed in."
         case .cancelled:
             return "Sign-in cancelled."
-        case .msalError(let details):
+        case .providerError(let details):
             if details.isEmpty { return "OneDrive sign-in failed." }
             return Self.withAuthSetupHintIfNeeded(base: "OneDrive sign-in failed: \(details)", details: details)
-        case .msalInitializationFailed(let underlying):
-            if underlying.isEmpty {
-                return "OneDrive auth setup failed."
-            }
-            return Self.withAuthSetupHintIfNeeded(base: "OneDrive auth setup failed: \(underlying)", details: underlying)
         case .invalidRedirectURL:
             return "Invalid redirect URL."
         case .missingAuthorizationCode:
             return "Authorization code missing."
-        case .tokenResponseMissingFields:
-            return "Token response missing fields."
-        case .httpError(let status, _):
-            return "HTTP \(status)."
+        case .tokenResponseMissingFields(let details):
+            if details.isEmpty {
+                return "Token response missing fields."
+            }
+            return "Token response missing fields: \(details)"
+        case .httpError(let status, let body):
+            let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmedBody.isEmpty == false else { return "HTTP \(status)." }
+            return "HTTP \(status): \(trimmedBody.prefix(300))"
         }
     }
 
     private static func withAuthSetupHintIfNeeded(base: String, details: String) -> String {
-        guard looksLikeMissingKeychainEntitlement(details) else {
+        guard oneDriveAuthLooksLikeMissingEntitlement(details) else {
             return base
         }
         return """
         \(base) This usually means keychain access is unavailable for this build (OSStatus -34018). Build and run from Xcode with Team + Automatically manage signing.
         """
     }
-
-    private static func looksLikeMissingKeychainEntitlement(_ details: String) -> Bool {
-        details.contains("-34018")
-            || details.localizedCaseInsensitiveContains("errSecMissingEntitlement")
-    }
 }
-
-#if canImport(MSAL)
-import AppKit
-import MSAL
-
-@MainActor
-final class OneDriveAuthService: AuthService {
-    private let config: OneDriveConfig
-    private var application: MSALPublicClientApplication?
-    private var applicationInitError: Error?
-    private var currentAccount: MSALAccount?
-
-    init(config: OneDriveConfig = OneDriveConfig()) {
-        self.config = config
-        super.init()
-
-        guard config.isConfigured else { return }
-        do {
-            let authority = try MSALAADAuthority(url: config.authorityURL)
-            let msalConfig = MSALPublicClientApplicationConfig(
-                clientId: config.clientId,
-                redirectUri: config.redirectUri,
-                authority: authority
-            )
-            // Use a private cache group so auth works even when shared keychain entitlements
-            // are unavailable in unsigned/CI artifacts.
-            if let bundleIdentifier = Bundle.main.bundleIdentifier, !bundleIdentifier.isEmpty {
-                msalConfig.cacheConfig.keychainSharingGroup = bundleIdentifier
-            }
-            let app = try MSALPublicClientApplication(configuration: msalConfig)
-            self.application = app
-            self.currentAccount = try app.allAccounts().first
-            self.isSignedIn = self.currentAccount != nil
-            self.signedInUsername = self.currentAccount?.username
-        } catch {
-            self.applicationInitError = error
-            self.application = nil
-            self.currentAccount = nil
-            self.isSignedIn = false
-            self.signedInUsername = nil
-        }
-    }
-
-    override func signOut() {
-        let accountToRemove = currentAccount
-        currentAccount = nil
-        isSignedIn = false
-        signedInUsername = nil
-
-        guard let application, let accountToRemove else { return }
-        do {
-            try application.remove(accountToRemove)
-        } catch {
-        }
-    }
-
-    override func validAccessToken() async throws -> String {
-        let application = try ensureApplication()
-        let account = try ensureAccount(application: application)
-
-        let params = MSALSilentTokenParameters(scopes: config.msalScopes, account: account)
-        do {
-            let result = try await acquireTokenSilent(application: application, params: params)
-            return result.accessToken
-        } catch {
-            throw OneDriveAuthError.msalError(details: Self.describeMSALError(error))
-        }
-    }
-
-    override func signIn() async throws {
-        let application = try ensureApplication()
-
-        let webviewParams = MSALWebviewParameters(authPresentationViewController: presentationViewController())
-        let params = MSALInteractiveTokenParameters(scopes: config.msalScopes, webviewParameters: webviewParams)
-        params.promptType = .selectAccount
-
-        do {
-            let result = try await acquireTokenInteractive(application: application, params: params)
-            currentAccount = result.account
-            isSignedIn = true
-            signedInUsername = result.account.username
-        } catch {
-            throw OneDriveAuthError.msalError(details: Self.describeMSALError(error))
-        }
-    }
-
-    private func ensureApplication() throws -> MSALPublicClientApplication {
-        guard config.isConfigured else {
-            throw OneDriveAuthError.notConfigured(details: config.configurationStatusSummary)
-        }
-        if let application { return application }
-        if let applicationInitError {
-            throw OneDriveAuthError.msalInitializationFailed(underlying: Self.describeMSALError(applicationInitError))
-        }
-        throw OneDriveAuthError.notConfigured(details: config.configurationStatusSummary)
-    }
-
-    private func ensureAccount(application: MSALPublicClientApplication) throws -> MSALAccount {
-        if let currentAccount { return currentAccount }
-        let account = try application.allAccounts().first
-        guard let account else { throw OneDriveAuthError.notSignedIn }
-        currentAccount = account
-        isSignedIn = true
-        signedInUsername = account.username
-        return account
-    }
-
-    private func acquireTokenInteractive(
-        application: MSALPublicClientApplication,
-        params: MSALInteractiveTokenParameters
-    ) async throws -> MSALResult {
-        try await withCheckedThrowingContinuation { continuation in
-            application.acquireToken(with: params) { result, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard let result else {
-                    continuation.resume(throwing: OneDriveAuthError.tokenResponseMissingFields)
-                    return
-                }
-                continuation.resume(returning: result)
-            }
-        }
-    }
-
-    private func acquireTokenSilent(
-        application: MSALPublicClientApplication,
-        params: MSALSilentTokenParameters
-    ) async throws -> MSALResult {
-        try await withCheckedThrowingContinuation { continuation in
-            application.acquireTokenSilent(with: params) { result, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard let result else {
-                    continuation.resume(throwing: OneDriveAuthError.tokenResponseMissingFields)
-                    return
-                }
-                continuation.resume(returning: result)
-            }
-        }
-    }
-
-    private func presentationViewController() -> NSViewController {
-        NSApp.keyWindow?.contentViewController
-            ?? NSApp.windows.first?.contentViewController
-            ?? NSViewController()
-    }
-
-    private static func describeMSALError(_ error: Error) -> String {
-        let nsError = error as NSError
-        guard nsError.domain == MSALErrorDomain else {
-            return nsError.localizedDescription
-        }
-
-        var parts: [String] = []
-        parts.append("\(nsError.domain) \(nsError.code)")
-
-        if let internalCode = nsError.userInfo[MSALInternalErrorCodeKey] as? Int {
-            parts.append("internal=\(internalCode)")
-        } else if let internalCode = nsError.userInfo[MSALInternalErrorCodeKey] as? NSNumber {
-            parts.append("internal=\(internalCode.intValue)")
-        }
-
-        if let oauth = nsError.userInfo[MSALOAuthErrorKey] as? String, !oauth.isEmpty {
-            parts.append("oauth=\(oauth)")
-        }
-        if let sub = nsError.userInfo[MSALOAuthSubErrorKey] as? String, !sub.isEmpty {
-            parts.append("sub=\(sub)")
-        }
-        if let http = nsError.userInfo[MSALHTTPResponseCodeKey] as? Int {
-            parts.append("http=\(http)")
-        } else if let http = nsError.userInfo[MSALHTTPResponseCodeKey] as? NSNumber {
-            parts.append("http=\(http.intValue)")
-        }
-        if let corr = nsError.userInfo[MSALCorrelationIDKey] as? UUID {
-            parts.append("corr=\(corr.uuidString)")
-        } else if let corr = nsError.userInfo[MSALCorrelationIDKey] as? String, !corr.isEmpty {
-            parts.append("corr=\(corr)")
-        }
-
-        if let desc = nsError.userInfo[MSALErrorDescriptionKey] as? String, !desc.isEmpty {
-            parts.append(desc)
-        } else if !nsError.localizedDescription.isEmpty {
-            parts.append(nsError.localizedDescription)
-        }
-
-        return parts.joined(separator: " | ")
-    }
-}
-
-#else
-import AppKit
-import AuthenticationServices
-import CryptoKit
-import Security
 
 @MainActor
 final class OneDriveAuthService: AuthService {
     private let config: OneDriveConfig
     private let keychain = OneDriveTokenKeychain()
     private var authSession: ASWebAuthenticationSession?
+    private let presentationContextProvider = WebAuthPresentationContextProvider()
 
     private var token: OneDriveToken? {
         didSet {
@@ -285,7 +90,13 @@ final class OneDriveAuthService: AuthService {
         guard let currentToken = self.token else { throw OneDriveAuthError.notSignedIn }
         if !currentToken.isExpired { return currentToken.accessToken }
 
-        let refreshed = try await refreshAccessToken(refreshToken: currentToken.refreshToken)
+        guard let refreshToken = currentToken.refreshToken, refreshToken.isEmpty == false else {
+            self.token = nil
+            keychain.delete()
+            throw OneDriveAuthError.providerError(details: "Sign-in session expired. Please sign in again.")
+        }
+
+        let refreshed = try await refreshAccessToken(refreshToken: refreshToken)
         self.token = refreshed
         keychain.save(refreshed)
         return refreshed.accessToken
@@ -340,26 +151,60 @@ final class OneDriveAuthService: AuthService {
     private func startWebAuthSession(url: URL, callbackScheme: String?) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callbackURL, error in
-                if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-                    continuation.resume(throwing: OneDriveAuthError.cancelled)
-                    return
-                }
-                if let error = error {
-                    continuation.resume(throwing: error)
+                if let error {
+                    self.authSession = nil
+                    continuation.resume(throwing: Self.mapWebAuthenticationError(error))
                     return
                 }
                 guard let callbackURL else {
+                    self.authSession = nil
                     continuation.resume(throwing: OneDriveAuthError.invalidRedirectURL)
                     return
                 }
+                self.authSession = nil
                 continuation.resume(returning: callbackURL)
             }
 
-            session.presentationContextProvider = WebAuthPresentationContextProvider()
+            session.presentationContextProvider = presentationContextProvider
             session.prefersEphemeralWebBrowserSession = false
             self.authSession = session
-            session.start()
+            NSApp.activate(ignoringOtherApps: true)
+            if session.start() == false {
+                self.authSession = nil
+                continuation.resume(
+                    throwing: OneDriveAuthError.providerError(
+                        details: "Could not start sign-in session. Open Settings and try again."
+                    )
+                )
+            }
         }
+    }
+
+    private static func mapWebAuthenticationError(_ error: Error) -> OneDriveAuthError {
+        if let webAuthError = error as? ASWebAuthenticationSessionError {
+            return mapWebAuthenticationErrorCode(webAuthError.code.rawValue, fallback: webAuthError.localizedDescription)
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == "com.apple.AuthenticationServices.WebAuthenticationSession" {
+            return mapWebAuthenticationErrorCode(nsError.code, fallback: nsError.localizedDescription)
+        }
+
+        return OneDriveAuthError.providerError(details: error.localizedDescription)
+    }
+
+    private static func mapWebAuthenticationErrorCode(_ code: Int, fallback: String) -> OneDriveAuthError {
+        if code == ASWebAuthenticationSessionError.Code.canceledLogin.rawValue {
+            return .cancelled
+        }
+        if code == ASWebAuthenticationSessionError.Code.presentationContextNotProvided.rawValue
+            || code == ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue
+        {
+            return .providerError(
+                details: "Could not present sign-in window (AuthenticationServices error \(code)). Open Settings and try again."
+            )
+        }
+        return .providerError(details: fallback)
     }
 
     private func exchangeCodeForToken(code: String, codeVerifier: String) async throws -> OneDriveToken {
@@ -384,16 +229,24 @@ final class OneDriveAuthService: AuthService {
         }
 
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
+        if let authError = tokenResponse.error, authError.isEmpty == false {
+            let details = [authError, tokenResponse.error_description]
+                .compactMap { value -> String? in
+                    guard let value, value.isEmpty == false else { return nil }
+                    return value
+                }
+                .joined(separator: ": ")
+            throw OneDriveAuthError.providerError(details: "Token endpoint error: \(details)")
+        }
         guard let accessToken = tokenResponse.access_token,
-              let refreshToken = tokenResponse.refresh_token,
               let expiresIn = tokenResponse.expires_in
         else {
-            throw OneDriveAuthError.tokenResponseMissingFields
+            throw OneDriveAuthError.tokenResponseMissingFields(details: tokenResponse.missingFieldSummary)
         }
 
         return OneDriveToken(
             accessToken: accessToken,
-            refreshToken: refreshToken,
+            refreshToken: tokenResponse.refresh_token,
             expiresAt: Date().addingTimeInterval(TimeInterval(expiresIn))
         )
     }
@@ -419,10 +272,19 @@ final class OneDriveAuthService: AuthService {
         }
 
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
+        if let authError = tokenResponse.error, authError.isEmpty == false {
+            let details = [authError, tokenResponse.error_description]
+                .compactMap { value -> String? in
+                    guard let value, value.isEmpty == false else { return nil }
+                    return value
+                }
+                .joined(separator: ": ")
+            throw OneDriveAuthError.providerError(details: "Token endpoint error: \(details)")
+        }
         guard let accessToken = tokenResponse.access_token,
               let expiresIn = tokenResponse.expires_in
         else {
-            throw OneDriveAuthError.tokenResponseMissingFields
+            throw OneDriveAuthError.tokenResponseMissingFields(details: tokenResponse.missingFieldSummary)
         }
 
         return OneDriveToken(
@@ -435,7 +297,7 @@ final class OneDriveAuthService: AuthService {
 
 private struct OneDriveToken: Codable {
     let accessToken: String
-    let refreshToken: String
+    let refreshToken: String?
     let expiresAt: Date
 
     var isExpired: Bool {
@@ -449,11 +311,48 @@ private struct TokenResponse: Decodable {
     let expires_in: Int?
     let access_token: String?
     let refresh_token: String?
+    let error: String?
+    let error_description: String?
+
+    var missingFieldSummary: String {
+        var missing: [String] = []
+        if access_token == nil || access_token?.isEmpty == true {
+            missing.append("access_token")
+        }
+        if expires_in == nil {
+            missing.append("expires_in")
+        }
+        return missing.isEmpty ? "unexpected token payload" : missing.joined(separator: ", ")
+    }
 }
 
 private final class WebAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private var fallbackWindow: NSWindow?
+
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        NSApp.keyWindow ?? NSApp.windows.first ?? ASPresentationAnchor()
+        if let keyWindow = NSApp.keyWindow {
+            return keyWindow
+        }
+        if let mainWindow = NSApp.mainWindow {
+            return mainWindow
+        }
+        if let visibleWindow = NSApp.windows.first(where: { $0.isVisible }) {
+            return visibleWindow
+        }
+        if let fallbackWindow {
+            return fallbackWindow
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.orderFrontRegardless()
+        fallbackWindow = window
+        return window
     }
 }
 
@@ -553,4 +452,3 @@ private final class OneDriveTokenKeychain {
         SecItemDelete(query as CFDictionary)
     }
 }
-#endif

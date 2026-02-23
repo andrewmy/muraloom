@@ -84,7 +84,7 @@ struct MenuBarMenuView: View {
         activateAppAndOpenSettings()
 
         Task { @MainActor in
-            // Give the settings window a moment to become the key window for MSAL presentation.
+            // Give the settings window a moment to become the key window for sign-in presentation.
             try? await Task.sleep(nanoseconds: 150_000_000)
             do {
                 try await authService.signIn()

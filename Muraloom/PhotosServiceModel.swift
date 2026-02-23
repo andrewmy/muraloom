@@ -5,8 +5,8 @@ class PhotosServiceModel: ObservableObject, PhotosService {
         preconditionFailure("PhotosServiceModel.listAlbums() must be overridden")
     }
 
-    func probeAlbumUsablePhotoCountFirstPage(albumId: String) async throws -> Int {
-        preconditionFailure("PhotosServiceModel.probeAlbumUsablePhotoCountFirstPage() must be overridden")
+    func probeAlbumUsablePhotoCount(albumId: String) async throws -> Int {
+        preconditionFailure("PhotosServiceModel.probeAlbumUsablePhotoCount() must be overridden")
     }
 
     func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
@@ -116,7 +116,7 @@ final class UITestPhotosService: PhotosServiceModel {
         Self.items
     }
 
-    override func probeAlbumUsablePhotoCountFirstPage(albumId: String) async throws -> Int {
+    override func probeAlbumUsablePhotoCount(albumId: String) async throws -> Int {
         Self.items.count
     }
 

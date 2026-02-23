@@ -2,13 +2,13 @@
 
 This document outlines the user stories for the application, categorized into MVP (Minimum Viable Product) and Post-MVP features.
 
-Source of truth for technical implementation details and sequencing is `docs/PROJECT_PLAN.md` (MSAL auth + OneDrive Albums / Graph bundles).
+Source of truth for technical implementation details and sequencing is `docs/PROJECT_PLAN.md` (native OAuth auth + OneDrive Albums / Graph bundles).
 
 ## MVP User Stories
 
 These stories represent the core functionality required for the initial release.
 
-*   **As a user, I want to securely connect my OneDrive account (MSAL)** so the app can access my photos.
+*   **As a user, I want to securely connect my OneDrive account** so the app can access my photos.
 *   **As a user, I want to see a list of my OneDrive albums** so I can pick a source for wallpapers.
 *   **As a user, I want to select an album and have the selection remembered** so I don’t need to reconfigure it every time.
 *   **As a user, I want the app to validate my selected album on startup** so I can quickly fix issues if the album was deleted or permissions changed.

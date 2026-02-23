@@ -200,6 +200,47 @@ struct MuraloomTests {
         }
     }
 
+    @Test func searchPhotosTreatsRemoteItemImageAsUsable() async throws {
+        let (session, handlerId) = makeSession { request in
+            if request.url?.path.hasSuffix("/me/drive/items/a1") == true {
+                let json = """
+                {
+                  "id": "a1",
+                  "children": [
+                    {
+                      "id": "shortcut1",
+                      "name": "shortcut placeholder",
+                      "remoteItem": {
+                        "id": "remote1",
+                        "name": "actual-photo.jpg",
+                        "file": { "mimeType": "image/jpeg" },
+                        "image": { "width": 3024, "height": 4032 },
+                        "cTag": "rc1"
+                      }
+                    }
+                  ]
+                }
+                """
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(json.utf8)
+                )
+            }
+
+            throw URLError(.badURL)
+        }
+        defer { MockURLProtocol.removeHandler(for: handlerId) }
+
+        let service = OneDrivePhotosService(authService: TestTokenProvider(), session: session)
+        let items = try await service.searchPhotos(inAlbumId: "a1")
+        #expect(items.count == 1)
+        #expect(items.first?.id == "shortcut1")
+        #expect(items.first?.name == "actual-photo.jpg")
+        #expect(items.first?.pixelWidth == 3024)
+        #expect(items.first?.pixelHeight == 4032)
+        #expect(items.first?.mimeType == "image/jpeg")
+    }
+
     @Test func verifyAlbumExistsReturnsAlbumWhenBundleAlbumFacetPresent() async throws {
         let recorder = RequestRecorder()
         let (session, handlerId) = makeSession { request in
@@ -268,6 +309,52 @@ struct MuraloomTests {
         #expect(photos.first?.pixelWidth == 1920)
         #expect(photos.first?.pixelHeight == 1080)
         #expect(recorder.requests.count == 2)
+        #expect(recorder.requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
+    }
+
+    @Test func probeAlbumUsablePhotoCountSamplesFirstPageOnly() async throws {
+        let recorder = RequestRecorder()
+        let nextLink = "https://graph.microsoft.com/v1.0/me/drive/items/a1/children?$skiptoken=abc"
+        let (session, handlerId) = makeSession { request in
+            recorder.record(request)
+
+            if request.url?.path.hasSuffix("/me/drive/items/a1") == true {
+                let json = """
+                {
+                  "id": "a1",
+                  "children": [
+                    { "id": "p1", "cTag": "c1", "file": { "mimeType": "image/jpeg" }, "image": { "width": 1920, "height": 1080 }, "@microsoft.graph.downloadUrl": "https://download.example/p1" },
+                    { "id": "v1", "file": { "mimeType": "video/mp4" }, "@microsoft.graph.downloadUrl": "https://download.example/v1" }
+                  ],
+                  "children@odata.nextLink": "\(nextLink)"
+                }
+                """
+                let data = Data(json.utf8)
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, data)
+            }
+
+            if request.url?.absoluteString == nextLink {
+                let json = """
+                {
+                  "value": [
+                    { "id": "p2", "cTag": "c2", "image": { "width": 800, "height": 600 }, "@microsoft.graph.downloadUrl": "https://download.example/p2" }
+                  ]
+                }
+                """
+                let data = Data(json.utf8)
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, data)
+            }
+
+            throw URLError(.badURL)
+        }
+        defer { MockURLProtocol.removeHandler(for: handlerId) }
+
+        let service = OneDrivePhotosService(authService: TestTokenProvider(), session: session)
+        let count = try await service.probeAlbumUsablePhotoCount(albumId: "a1")
+        #expect(count == 1)
+        #expect(recorder.requests.count == 1)
         #expect(recorder.requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer test-token" })
     }
 

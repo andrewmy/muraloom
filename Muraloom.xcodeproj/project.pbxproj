@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		25A0D1C12F0B4C3D00A1B2C3 /* MSAL in Frameworks */ = {isa = PBXBuildFile; productRef = 25A0D1C32F0B4C3D00A1B2C3 /* MSAL */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		2576DBF12E574FBD0008C4F3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -71,7 +67,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				25A0D1C12F0B4C3D00A1B2C3 /* MSAL in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,7 +136,6 @@
 			);
 			name = Muraloom;
 			packageProductDependencies = (
-				25A0D1C32F0B4C3D00A1B2C3 /* MSAL */,
 			);
 			productName = Muraloom;
 			productReference = 2576DBE22E574FBC0008C4F3 /* Muraloom.app */;
@@ -226,7 +220,6 @@
 			mainGroup = 2576DBD92E574FBC0008C4F3;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2576DBE32E574FBC0008C4F3 /* Products */;
@@ -602,25 +595,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/AzureAD/microsoft-authentication-library-for-objc";
-			requirement = {
-				kind = exactVersion;
-				version = 1.9.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		25A0D1C32F0B4C3D00A1B2C3 /* MSAL */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 25A0D1C22F0B4C3D00A1B2C3 /* XCRemoteSwiftPackageReference "microsoft-authentication-library-for-objc" */;
-			productName = MSAL;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2576DBDA2E574FBC0008C4F3 /* Project object */;
 }

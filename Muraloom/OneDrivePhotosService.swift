@@ -85,10 +85,10 @@ final class OneDrivePhotosService: PhotosServiceModel {
             "/me/drive/items/\(albumId)",
             query: [
                 .init(name: "$select", value: "id"),
-                .init(
-                    name: "$expand",
-                    value: "children($select=id,name,webUrl,file,image,photo,cTag)"
-                ),
+            .init(
+                name: "$expand",
+                value: "children($select=id,name,webUrl,file,image,photo,cTag,remoteItem)"
+            ),
             ]
         )
 
@@ -104,16 +104,15 @@ final class OneDrivePhotosService: PhotosServiceModel {
         return results
     }
 
-    override func probeAlbumUsablePhotoCountFirstPage(albumId: String) async throws -> Int {
+    override func probeAlbumUsablePhotoCount(albumId: String) async throws -> Int {
         let expandedChildren: DriveItemExpandedChildrenResponse = try await get(
             "/me/drive/items/\(albumId)",
             query: [
                 .init(name: "$select", value: "id"),
                 .init(
                     name: "$expand",
-                    // Note: for DriveItem children, Graph only supports $select/$expand inside $expand options.
-                    // $top in expand options yields a 400 (invalidRequest).
-                    value: "children($select=id,name,file,image,photo,cTag)"
+                    // Fast sample only: first page from expanded children.
+                    value: "children($select=id,name,file,image,photo,cTag,remoteItem)"
                 ),
             ]
         )
@@ -210,8 +209,12 @@ final class OneDrivePhotosService: PhotosServiceModel {
     private static func mediaItems(from driveItems: [DriveItem]) -> [MediaItem] {
         let supportsRaw = LibRawDecoder.isAvailable()
         return driveItems.compactMap { item -> MediaItem? in
-            let mime = item.file?.mimeType ?? ""
-            let lowercasedName = item.name?.lowercased() ?? ""
+            let effectiveName = item.remoteItem?.name ?? item.name
+            let lowercasedName = effectiveName?.lowercased() ?? ""
+            let effectiveFile = item.file ?? item.remoteItem?.file
+            let effectiveImage = item.image ?? item.remoteItem?.image
+            let effectivePhoto = item.photo ?? item.remoteItem?.photo
+            let mime = effectiveFile?.mimeType ?? ""
 
             let isRaw =
                 lowercasedName.hasSuffix(".arw")
@@ -224,8 +227,8 @@ final class OneDrivePhotosService: PhotosServiceModel {
 
             let isImage =
                 mime.hasPrefix("image/")
-                || item.image != nil
-                || item.photo != nil
+                || effectiveImage != nil
+                || effectivePhoto != nil
                 || isRaw
                 || lowercasedName.hasSuffix(".jpg")
                 || lowercasedName.hasSuffix(".jpeg")
@@ -235,12 +238,12 @@ final class OneDrivePhotosService: PhotosServiceModel {
             guard isImage, (isRaw == false || supportsRaw) else { return nil }
             return MediaItem(
                 id: item.id,
-                downloadUrl: item.downloadUrl.flatMap(URL.init(string:)),
-                pixelWidth: item.image?.width,
-                pixelHeight: item.image?.height,
-                name: item.name,
-                mimeType: item.file?.mimeType,
-                cTag: item.cTag
+                downloadUrl: (item.downloadUrl ?? item.remoteItem?.downloadUrl).flatMap(URL.init(string:)),
+                pixelWidth: effectiveImage?.width,
+                pixelHeight: effectiveImage?.height,
+                name: effectiveName,
+                mimeType: effectiveFile?.mimeType,
+                cTag: item.cTag ?? item.remoteItem?.cTag
             )
         }
     }
@@ -402,6 +405,7 @@ private struct DriveItem: Decodable {
     let file: FileFacet?
     let image: ImageFacet?
     let photo: PhotoFacet?
+    let remoteItem: RemoteItemFacet?
     let downloadUrl: String?
 
     enum CodingKeys: String, CodingKey {
@@ -411,6 +415,27 @@ private struct DriveItem: Decodable {
         case cTag
         case bundle
         case folder
+        case file
+        case image
+        case photo
+        case remoteItem
+        case downloadUrl = "@microsoft.graph.downloadUrl"
+    }
+}
+
+private struct RemoteItemFacet: Decodable {
+    let id: String?
+    let name: String?
+    let cTag: String?
+    let file: FileFacet?
+    let image: ImageFacet?
+    let photo: PhotoFacet?
+    let downloadUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case cTag
         case file
         case image
         case photo

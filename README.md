@@ -41,21 +41,16 @@ If clicking “Sign In” shows **“OneDrive auth is not configured”**, it me
 - Ensure `Muraloom/Secrets.xcconfig` exists and contains `ONEDRIVE_CLIENT_ID = ...` (this is used by `Muraloom/Info.plist` via `$(ONEDRIVE_CLIENT_ID)`).
 - Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
 - Verify `OneDriveScopes` is a space-separated list (e.g. `User.Read Files.Read`).
-  - Note: `openid`, `profile`, and `offline_access` are reserved OIDC scopes. MSAL handles these automatically, so don’t include them here.
+  - Note: use delegated Graph scopes your app needs (for read-only wallpaper fetch, `User.Read Files.Read` is enough).
 - For GitHub Actions release artifacts, set repository variable or secret `ONEDRIVE_CLIENT_ID`. CI writes it to a temporary `Muraloom/Secrets.xcconfig` during the build.
 
-If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL failed to initialize using the values from `Info.plist`.
+If clicking “Sign In” shows **“OneDrive sign-in failed …”**, the OAuth flow failed at runtime.
 
 - Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
 - Verify your app bundle identifier (Xcode target → **Signing & Capabilities** → **Bundle Identifier**) matches the `<bundle_id>` you entered in the Azure portal.
 - If you changed bundle ID / redirect settings recently, try **Product → Clean Build Folder** in Xcode and run again.
 - If the underlying error is **OSStatus -34018**, it usually means keychain access is unavailable for that build. Build/run from Xcode with your Team set and **Automatically manage signing** enabled.
-- CI release artifacts are ad-hoc signed by default. If signing secrets are configured, CI uses Developer ID signing, which is better for cross-machine auth testing.
-- To produce CI artifacts that are more likely to sign in on another machine, configure these GitHub secrets so CI can Developer ID-sign the app:
-  - `APPLE_TEAM_ID` (10-char Team ID, e.g. `ABCDE12345`)
-  - `APPLE_SIGNING_IDENTITY` (full identity, e.g. `Developer ID Application: Your Name (ABCDE12345)`)
-  - `APPLE_SIGNING_CERT_P12_BASE64` (base64 of exported `.p12` certificate)
-  - `APPLE_SIGNING_CERT_PASSWORD` (password used for that `.p12`)
+- CI release artifacts are ad-hoc signed and intended mainly for smoke testing; sign-in behavior is most reliable in a local Xcode-signed build.
 
 If you downloaded `Muraloom.app` and macOS refuses to open it, remove the quarantine attribute and try again:
 

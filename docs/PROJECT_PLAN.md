@@ -7,7 +7,7 @@ This document outlines the technical plan for Muraloom, including the OneDrive/G
 - Repo is aligned to OneDrive (Google Sign-In removed).
 - Core wallpaper pipeline exists (`WallpaperManager`) and settings UI exists.
 - Implemented:
-  - `OneDriveAuthService`: **MSAL** wrapper (interactive sign-in, silent token acquisition, sign-out).
+  - `OneDriveAuthService`: native OAuth (`ASWebAuthenticationSession` + PKCE, refresh-token based session).
   - `OneDrivePhotosService`: Microsoft Graph v1.0 for **albums (bundle albums)** (list albums, verify album, fetch photos in an album).
   - Settings UI: sign-in + **album** selection (+ link to manage albums in OneDrive Photos).
 - CLI builds: `xcodebuild -scheme Muraloom -destination 'platform=macOS' ... build` succeeds when the environment has keychain/signing access.
@@ -26,7 +26,7 @@ This document outlines the technical plan for Muraloom, including the OneDrive/G
 
 ### What works today (album mode)
 
-- Sign in/out (MSAL) and silent token acquisition for scheduled wallpaper updates.
+- Sign in/out and refresh-token based token acquisition for scheduled wallpaper updates.
 - List albums, select an album, and fetch image items from that album via Graph.
 - Wallpaper update:
   - Downloads via `GET /me/drive/items/{item-id}/content` (authorized)
@@ -44,8 +44,7 @@ This document outlines the technical plan for Muraloom, including the OneDrive/G
 
 ## Decisions (locked in)
 
-1. **Auth library:** MSAL (Microsoft Authentication Library).
-  - Other providers may use AppAuth or other mechanism
+1. **Auth approach:** native OAuth (`ASWebAuthenticationSession` + PKCE) for minimum maintenance surface.
 2. **Wallpaper source:** OneDrive **Albums** (Graph “bundle album”) instead of folders.
 
 ## What “album” means in Graph
@@ -76,21 +75,14 @@ Current implementation uses the bundles endpoints and identifies “album-like�
 
 ## Remaining work (phased)
 
-### Phase 1 — Switch auth to MSAL (done)
+### Phase 1 — Native auth flow (done)
 
-- Add MSAL dependency (SwiftPM).
-- Implement `OneDriveAuthService` as an MSAL wrapper:
+- Implement `OneDriveAuthService` with native OAuth:
   - Interactive sign-in + sign-out
-  - Silent token acquisition for scheduled wallpaper updates
-  - Multiple accounts: decide whether to support now or later (MSAL makes this easier).
+  - Refresh-token based token acquisition for scheduled wallpaper updates
 - Update configuration:
   - Redirect URI uses `msauth.<bundle_id>://auth` (Azure portal iOS/macOS platform).
   - Local dev client id via `Muraloom/Secrets.xcconfig` (gitignored) → `ONEDRIVE_CLIENT_ID` → `OneDriveClientId` in `Info.plist`.
-  - Avoid passing reserved OIDC scopes to MSAL acquire-token calls (`openid`, `profile`, `offline_access`).
-- Keychain entitlement (macOS):
-  - Ensure `keychain-access-groups` includes `$(AppIdentifierPrefix)com.microsoft.identity.universalstorage` (MSAL default cache group), otherwise you may hit OSStatus `-34018`.
-- Cleanup (later):
-  - Remove the native `ASWebAuthenticationSession` + PKCE fallback once MSAL is stable.
 
 ### Phase 2 — Albums API (Graph bundles) (done)
 
@@ -100,7 +92,7 @@ Current implementation uses the bundles endpoints and identifies “album-like�
   - Rename settings from folder to album: `selectedAlbumId`, `selectedAlbumName`, `selectedAlbumWebUrl`.
   - Ensure picture metadata is captured (`width/height`) to support filtering in `WallpaperManager`.
 - Scopes:
-  - Start: `User.Read Files.Read` (MSAL handles OIDC reserved scopes like `offline_access` automatically)
+  - Start: `User.Read Files.Read`
   - Add later if needed: `Files.ReadWrite` (create album / add items).
 
 ### Phase 3 — UI update (albums instead of folders) (done)
@@ -213,5 +205,4 @@ These are desirable, but not required to ship MVP.
 ## Cleanup checklist
 
 - Remove folder-centric UI/strings once albums are the default. (done)
-- Remove native OAuth implementation once MSAL is fully wired.
 - Ensure `Info.plist` contains only the final OAuth callback configuration and documented keys.

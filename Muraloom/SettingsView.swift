@@ -10,7 +10,10 @@ struct SettingsView: View {
     @EnvironmentObject var appTesting: AppTesting
 
     private let usablePhotosHelp =
-        "Usable photos are image items (image/* files or items with image/photo metadata). Videos are ignored. RAW photos (ARW/DNG/etc) are included only when LibRaw support is enabled. The quick check scans only the first page."
+        """
+        Usable photos are image items (image/* files or items with image/photo metadata). Videos are ignored. RAW photos (ARW/DNG/etc) are included only when LibRaw support is enabled. This is a fast first-page sample and can undercount large albums.
+        The “usable media” full-scan count is before wallpaper filters. The “eligible” count is after minimum-width and horizontal-only filters, so it can be lower.
+        """
 
     @State private var albums: [OneDriveAlbum] = []
     @State private var isSigningIn: Bool = false
@@ -18,7 +21,7 @@ struct SettingsView: View {
     @State private var didAttemptLoadAlbums: Bool = false
     @State private var didValidateStoredSelection: Bool = false
     @State private var didAutoLoadAlbums: Bool = false
-    @State private var selectedAlbumUsableCountFirstPage: Int?
+    @State private var selectedAlbumUsableCount: Int?
     @State private var oneDriveError: String?
 #if DEBUG
     @State private var oneDriveDebugInfo: String?
@@ -68,6 +71,10 @@ struct SettingsView: View {
                         albums = []
                         didAttemptLoadAlbums = false
                         didAutoLoadAlbums = false
+                        settings.albumRawPictureCount = 0
+                        settings.albumPictureCount = 0
+                        settings.showNoPicturesWarning = false
+                        selectedAlbumUsableCount = nil
                     } label: {
                         Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
@@ -151,9 +158,9 @@ struct SettingsView: View {
                             .accessibilityIdentifier("albums.picker")
 
                         if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
-                            if let count = selectedAlbumUsableCountFirstPage {
+                            if let count = selectedAlbumUsableCount {
                                 HStack(spacing: 6) {
-                                    Text("Usable photos (first page only): \(count)")
+                                    Text("Usable photos (first-page sample): \(count)")
                                     Image(systemName: "questionmark.circle")
                                         .foregroundStyle(.secondary)
                                         .imageScale(.small)
@@ -162,7 +169,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                             } else {
                                 HStack(spacing: 6) {
-                                    Text("Usable photos (first page): …")
+                                    Text("Usable photos (first-page sample): …")
                                     Image(systemName: "questionmark.circle")
                                         .foregroundStyle(.secondary)
                                         .imageScale(.small)
@@ -178,9 +185,24 @@ struct SettingsView: View {
                     }
 
                     if let albumId = settings.selectedAlbumId, !albumId.isEmpty {
+                        let hasLastScan = settings.albumRawPictureCount > 0 || settings.showNoPicturesWarning
+                        if hasLastScan {
+                            HStack(spacing: 6) {
+                                Text("Usable media (last full scan): \(settings.albumRawPictureCount)")
+                                Image(systemName: "questionmark.circle")
+                                    .foregroundStyle(.secondary)
+                                    .imageScale(.small)
+                                    .help(usablePhotosHelp)
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                        if settings.albumRawPictureCount > settings.albumPictureCount {
+                            Text("Filtered out by size/orientation settings: \(settings.albumRawPictureCount - settings.albumPictureCount)")
+                                .foregroundStyle(.secondary)
+                        }
                         if settings.albumPictureCount > 0 {
                             HStack(spacing: 6) {
-                                Text("Usable photos (last scan): \(settings.albumPictureCount)")
+                                Text("Eligible for wallpaper (last full scan): \(settings.albumPictureCount)")
                                 Image(systemName: "questionmark.circle")
                                     .foregroundStyle(.secondary)
                                     .imageScale(.small)
@@ -189,9 +211,9 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         }
                         if settings.showNoPicturesWarning {
-                            Text("No usable photos found (checked the first page for image items).")
+                            Text("No usable photos found in the latest full scan.")
                                 .foregroundStyle(.orange)
-                            Text("To fix: ensure the album contains images (not just videos). If you just changed the album in OneDrive Photos (web/mobile), wait a moment and check again.")
+                            Text("To fix: ensure the album contains images (not just videos). If this album should have more, lower Minimum Picture Width and/or disable Only Horizontal Photos. If you just changed the album in OneDrive Photos (web/mobile), wait a moment and check again.")
                                 .font(.system(.caption))
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -348,8 +370,14 @@ struct SettingsView: View {
 	                                        Task {
 	                                            do {
 	                                                let photos = try await photosService.searchPhotos(inAlbumId: albumId)
-	                                                settings.albumPictureCount = photos.count
-	                                                settings.showNoPicturesWarning = photos.isEmpty
+	                                                let eligible = WallpaperManager.eligibleMediaItems(
+	                                                    from: photos,
+	                                                    minimumPictureWidth: settings.minimumPictureWidth,
+	                                                    horizontalPhotosOnly: settings.horizontalPhotosOnly
+	                                                )
+	                                                settings.albumRawPictureCount = photos.count
+	                                                settings.albumPictureCount = eligible.count
+	                                                settings.showNoPicturesWarning = eligible.isEmpty
 	                                            } catch {
 	                                                oneDriveError = error.localizedDescription
 	                                            }
@@ -580,6 +608,7 @@ struct SettingsView: View {
             } else {
                 oneDriveError = "Previously selected album couldn’t be validated as an accessible OneDrive album. Keeping your saved Album ID, but wallpaper updates may fail until it’s available."
                 settings.albumPictureCount = 0
+                settings.albumRawPictureCount = 0
                 settings.showNoPicturesWarning = false
             }
         } catch OneDriveAuthError.notSignedIn {
@@ -587,6 +616,7 @@ struct SettingsView: View {
         } catch OneDriveGraphError.httpError(let status, _) where status == 403 || status == 404 {
             oneDriveError = "Previously selected album could not be accessed (HTTP \(status)). Keeping your saved Album ID, but wallpaper updates may fail until it’s accessible."
             settings.albumPictureCount = 0
+            settings.albumRawPictureCount = 0
             settings.showNoPicturesWarning = false
         } catch {
             oneDriveError = error.localizedDescription
@@ -599,8 +629,9 @@ struct SettingsView: View {
         settings.selectedAlbumName = album.name
         settings.selectedAlbumWebUrl = album.webUrl
         settings.albumPictureCount = 0
+        settings.albumRawPictureCount = 0
         settings.showNoPicturesWarning = false
-        selectedAlbumUsableCountFirstPage = nil
+        selectedAlbumUsableCount = nil
         wallpaperManager.startWallpaperUpdates()
 
         if shouldProbePhotos {
@@ -615,10 +646,9 @@ struct SettingsView: View {
         guard settings.selectedAlbumId == albumId else { return }
 
         do {
-            let count = try await photosService.probeAlbumUsablePhotoCountFirstPage(albumId: albumId)
+            let count = try await photosService.probeAlbumUsablePhotoCount(albumId: albumId)
             guard settings.selectedAlbumId == albumId else { return }
-            selectedAlbumUsableCountFirstPage = count
-            settings.showNoPicturesWarning = count == 0
+            selectedAlbumUsableCount = count
         } catch OneDriveAuthError.notSignedIn {
             // Ignore; user is effectively signed out.
         } catch {

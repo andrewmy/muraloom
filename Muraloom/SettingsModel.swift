@@ -58,6 +58,7 @@ class SettingsModel: ObservableObject {
     @Published var lastSuccessfulWallpaperUpdate: Date? { didSet { persistIfReady() } }
     @Published var lastSetWallpaperItemId: String? { didSet { persistIfReady() } }
     @Published var lastSetWallpaperItemName: String? { didSet { persistIfReady() } }
+    @Published var albumRawPictureCount: Int = 0
     @Published var albumPictureCount: Int = 0
     @Published var showNoPicturesWarning: Bool = false
 

@@ -147,51 +147,10 @@ jobs:
             echo "No bundled dylibs found; skipping minos check"
           fi
 
-      - name: Sign release app artifact (Developer ID if configured)
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_SIGNING_CERT_P12_BASE64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
-          APPLE_SIGNING_CERT_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_PASSWORD }}
+      - name: Ad-hoc sign release app artifact
         run: |
           set -euo pipefail
-
-          if test -z "${APPLE_TEAM_ID:-}" || test -z "${APPLE_SIGNING_IDENTITY:-}" || test -z "${APPLE_SIGNING_CERT_P12_BASE64:-}" || test -z "${APPLE_SIGNING_CERT_PASSWORD:-}"; then
-            echo "::warning::Developer ID signing secrets are not fully configured. Falling back to ad-hoc signing; interactive OneDrive auth may fail on other machines."
-            codesign --force --deep --sign - build/ci/Muraloom.app
-            exit 0
-          fi
-
-          KEYCHAIN_PATH=/tmp/muraloom-signing.keychain-db
-          KEYCHAIN_PASSWORD="$(uuidgen)"
-          CERT_PATH=/tmp/muraloom-signing-cert.p12
-          ENTITLEMENTS_PATH=/tmp/muraloom-signing.entitlements
-          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ci/Muraloom.app/Contents/Info.plist)"
-          trap 'security delete-keychain "$KEYCHAIN_PATH" || true; rm -f "$CERT_PATH" "$ENTITLEMENTS_PATH"' EXIT
-
-          printf '%s' "${APPLE_SIGNING_CERT_P12_BASE64}" | base64 -D -o "$CERT_PATH"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_SIGNING_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          cat > "$ENTITLEMENTS_PATH" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>keychain-access-groups</key>
-            <array>
-              <string>${APPLE_TEAM_ID}.${BUNDLE_ID}</string>
-              <string>${APPLE_TEAM_ID}.com.microsoft.identity.universalstorage</string>
-            </array>
-          </dict>
-          </plist>
-          EOF
-
-          codesign --force --deep --options runtime --keychain "$KEYCHAIN_PATH" --entitlements "$ENTITLEMENTS_PATH" --sign "$APPLE_SIGNING_IDENTITY" build/ci/Muraloom.app
+          codesign --force --deep --sign - build/ci/Muraloom.app
 
       - name: Verify release app signature
         run: |

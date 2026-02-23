@@ -241,6 +241,7 @@ final class WallpaperManager: ObservableObject {
             if Task.isCancelled { return }
 
             updateStage = .filtering
+            settings.albumRawPictureCount = mediaItems.count
             let filteredItems = filterMediaItems(mediaItems)
             settings.albumPictureCount = filteredItems.count
             settings.showNoPicturesWarning = filteredItems.isEmpty
@@ -409,18 +410,30 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-    private func filterMediaItems(_ items: [MediaItem]) -> [MediaItem] {
+    nonisolated static func eligibleMediaItems(
+        from items: [MediaItem],
+        minimumPictureWidth: Double,
+        horizontalPhotosOnly: Bool
+    ) -> [MediaItem] {
         items.filter { item in
-            if settings.minimumPictureWidth > 0, let width = item.pixelWidth, Double(width) < settings.minimumPictureWidth {
+            if minimumPictureWidth > 0, let width = item.pixelWidth, Double(width) < minimumPictureWidth {
                 return false
             }
 
-            if settings.horizontalPhotosOnly, let width = item.pixelWidth, let height = item.pixelHeight, width < height {
+            if horizontalPhotosOnly, let width = item.pixelWidth, let height = item.pixelHeight, width < height {
                 return false
             }
 
             return true
         }
+    }
+
+    private func filterMediaItems(_ items: [MediaItem]) -> [MediaItem] {
+        Self.eligibleMediaItems(
+            from: items,
+            minimumPictureWidth: settings.minimumPictureWidth,
+            horizontalPhotosOnly: settings.horizontalPhotosOnly
+        )
     }
 
     private func persistLastSetWallpaperItem(_ item: MediaItem) {
