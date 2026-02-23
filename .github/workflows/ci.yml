@@ -67,6 +67,22 @@ jobs:
           OTHER_LDFLAGS = \$(inherited) -lraw
           EOF
 
+      - name: Inject OneDrive client id (xcconfig)
+        env:
+          ONEDRIVE_CLIENT_ID: ${{ vars.ONEDRIVE_CLIENT_ID != '' && vars.ONEDRIVE_CLIENT_ID || secrets.ONEDRIVE_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+
+          if test -z "${ONEDRIVE_CLIENT_ID:-}"; then
+            echo "::warning::ONEDRIVE_CLIENT_ID is not set (vars/secrets). Release artifact auth will be unconfigured."
+            exit 0
+          fi
+
+          cat > Muraloom/Secrets.xcconfig <<EOF
+          // Auto-generated in CI to configure OneDrive auth.
+          ONEDRIVE_CLIENT_ID = ${ONEDRIVE_CLIENT_ID}
+          EOF
+
       - name: Build Release app (arm64, no signing)
         run: |
           set -euo pipefail
@@ -85,6 +101,24 @@ jobs:
           mkdir -p build/ci
           rm -rf build/ci/Muraloom.app
           ditto /tmp/muraloom_deriveddata_release/Build/Products/Release/Muraloom.app build/ci/Muraloom.app
+
+      - name: Verify release artifact auth config
+        run: |
+          set -euo pipefail
+          CLIENT_ID="$(/usr/libexec/PlistBuddy -c 'Print :OneDriveClientId' build/ci/Muraloom.app/Contents/Info.plist || true)"
+
+          if test -n "${CLIENT_ID}" && test "${CLIENT_ID}" != "YOUR_ONEDRIVE_CLIENT_ID" && [[ "${CLIENT_ID}" != *'$('* ]]; then
+            echo "OneDrive client id is configured in release artifact."
+            exit 0
+          fi
+
+          if test "${{ github.event_name }}" = "pull_request"; then
+            echo "::warning::Release artifact has placeholder OneDriveClientId on pull_request run."
+            exit 0
+          fi
+
+          echo "ERROR: Release artifact has placeholder OneDriveClientId. Set repo variable/secret ONEDRIVE_CLIENT_ID." >&2
+          exit 1
 
       - name: Bundle Homebrew dylibs into app
         run: |

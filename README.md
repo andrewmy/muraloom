@@ -42,6 +42,7 @@ If clicking “Sign In” shows **“OneDrive auth is not configured”**, it me
 - Verify `OneDriveRedirectUri` matches the redirect URI shown in the Azure portal for the **iOS/macOS** platform (usually `msauth.<bundle_id>://auth`).
 - Verify `OneDriveScopes` is a space-separated list (e.g. `User.Read Files.Read`).
   - Note: `openid`, `profile`, and `offline_access` are reserved OIDC scopes. MSAL handles these automatically, so don’t include them here.
+- For GitHub Actions release artifacts, set repository variable or secret `ONEDRIVE_CLIENT_ID`. CI writes it to a temporary `Muraloom/Secrets.xcconfig` during the build.
 
 If clicking “Sign In” shows **“OneDrive auth setup failed …”**, MSAL failed to initialize using the values from `Info.plist`.
 
