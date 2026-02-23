@@ -136,6 +136,8 @@ xcodebuild -scheme Muraloom -destination 'platform=macOS' -derivedDataPath /tmp/
 Convenience `just` recipes:
 
 ```bash
+just release-app  # signed Release app + zip (portable build output)
+just release-upload v1.2.3  # upload build/release-app/Muraloom-signed.zip (creates release if missing)
 just test      # unit tests
 just coverage  # unit tests + coverage gate
 just ui-test   # UI tests

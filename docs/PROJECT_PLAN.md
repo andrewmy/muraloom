@@ -17,7 +17,7 @@ This document outlines the technical plan for Muraloom, including the OneDrive/G
 - Target builds: **Apple silicon only** (`arm64`).
 - If RAW (LibRaw) support is enabled, the app links against Homebrew dylibs by default (e.g. `libraw`, plus transitive deps).
   - For GitHub Releases, bundle required Homebrew dylibs into `Muraloom.app/Contents/Frameworks` and rewrite load paths to `@rpath/...`.
-  - The repo includes a local build helper: `just release-app`, which copies a Release `.app` into `build/release-app/` and bundles Homebrew dylibs.
+  - The repo includes a local build helper: `just release-app`, which builds a signed Release `.app` and zips it to `build/release-app/Muraloom-signed.zip` for transfer/testing.
 - Important compatibility check: ensure bundled dylibs are built for a minimum macOS version that matches the app’s deployment target.
   - Example: Homebrew dylibs built on newer macOS can have a higher `minos` (`LC_BUILD_VERSION`) than the app target, which will break on older macOS versions.
 - Codesigning / notarization (planned):

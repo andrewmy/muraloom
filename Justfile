@@ -20,15 +20,28 @@ only_active_arch := "YES"
 bundle_homebrew_prefix := "/opt/homebrew"
 bundle_script := "bin/bundle-homebrew-dylibs.sh"
 
-# Build a Release (non-Debug) macOS .app and copy it into a gitignored dir.
-# Bundles any Homebrew dylibs the app links against (LibRaw + deps) and ad-hoc signs the result. (Not notarized.)
+# Build a signed Release app using local Xcode signing settings and package it as a zip.
+# This is the portable build path for moving the app to another machine.
 release-app:
   mkdir -p {{out_dir}}
   rm -rf {{out_dir}}/{{app_name}}
+  rm -f {{out_dir}}/Muraloom-signed.zip
   xcodebuild -scheme {{scheme}} -destination '{{destination}}' -configuration {{configuration}} -derivedDataPath {{derived_data}} ARCHS={{build_archs}} ONLY_ACTIVE_ARCH={{only_active_arch}} build
   ditto {{derived_data}}/Build/Products/{{configuration}}/{{app_name}} {{out_dir}}/{{app_name}}
-  {{bundle_script}} {{out_dir}}/{{app_name}} {{app_binary}} {{entitlements}} {{bundle_homebrew_prefix}}
+  codesign --verify --deep --strict {{out_dir}}/{{app_name}}
+  ditto -c -k --sequesterRsrc --keepParent {{out_dir}}/{{app_name}} {{out_dir}}/Muraloom-signed.zip
   @echo "Built {{out_dir}}/{{app_name}}"
+  @echo "Packed {{out_dir}}/Muraloom-signed.zip"
+
+# Upload the signed release zip to a GitHub Release tag.
+# Creates the release if it doesn't exist yet.
+# Example: just release-upload v1.2.3
+release-upload tag:
+  test -n "{{tag}}"
+  test -f {{out_dir}}/Muraloom-signed.zip
+  gh release view "{{tag}}" >/dev/null 2>&1 || gh release create "{{tag}}" --title "{{tag}}" --notes ""
+  gh release upload "{{tag}}" {{out_dir}}/Muraloom-signed.zip --clobber
+  @echo "Uploaded {{out_dir}}/Muraloom-signed.zip to release {{tag}}"
 
 # Build a Debug macOS .app and copy it into a gitignored dir.
 debug-app:
