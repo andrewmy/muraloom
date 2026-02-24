@@ -80,6 +80,34 @@ struct WallpaperImageTranscoderTests {
         }
     }
 
+    @Test func asyncWrapperTranscodesImage() async throws {
+        let image = makeCGImage(width: 1024, height: 768)
+        let png = encode(image, as: .png)
+
+        let jpeg = try await WallpaperImageTranscoder.prepareWallpaperJPEGAsync(
+            from: png,
+            maxDimension: 400,
+            filenameHint: "photo.png",
+            quality: 0.85
+        )
+        #expect(jpeg.count > 2)
+        #expect(jpeg[0] == 0xFF && jpeg[1] == 0xD8)
+
+        let size = try #require(decodePixelSize(jpeg))
+        #expect(max(size.w, size.h) <= 400)
+    }
+
+    @Test func transcoderErrorDescriptionsAreStable() {
+        #expect(WallpaperImageTranscoderError.invalidImageData.errorDescription == "Image decode failed.")
+        #expect(WallpaperImageTranscoderError.thumbnailCreationFailed.errorDescription == "Image resize failed.")
+        #expect(WallpaperImageTranscoderError.jpegDestinationCreationFailed.errorDescription == "JPEG encoder setup failed.")
+        #expect(WallpaperImageTranscoderError.jpegFinalizeFailed.errorDescription == "JPEG encode failed.")
+    }
+
+    @Test func supportsRawDecodingMatchesLibRawAvailability() {
+        #expect(WallpaperImageTranscoder.supportsRawDecoding == LibRawDecoder.isAvailable())
+    }
+
     @Test func rawUnsupportedThrowsClearErrorWhenLibRawDisabled() throws {
         guard LibRawDecoder.isAvailable() == false else {
             // CI/local builds with LibRaw enabled will attempt a real decode; skip here.
@@ -93,6 +121,12 @@ struct WallpaperImageTranscoderTests {
         } catch {
             #expect(error.localizedDescription.contains("RAW photos aren’t supported"))
         }
+    }
+
+    @Test func recommendedDisplayDimensionHasPositiveFallback() {
+        let dimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
+        #expect(dimension > 0)
+        #expect(WallpaperImageTranscoder.maxPhysicalDisplayPixelDimension() == dimension)
     }
 
     @Test func parsesPreferredTimingFromEDID() {
