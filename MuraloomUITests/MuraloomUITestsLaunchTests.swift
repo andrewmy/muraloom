@@ -16,9 +16,10 @@ final class MuraloomUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = ["-ui-testing", "-ApplePersistenceIgnoreState", "YES"]
         app.launchEnvironment["MURALOOM_UI_TESTING"] = "1"
         app.launch()
+        app.activate()
 
         // Insert steps here to perform after app launch but before taking a screenshot,
         // such as logging into a test account or navigating somewhere in the app
