@@ -56,25 +56,30 @@ debug-app:
 
 # Run unit tests (kept fast; UI tests are a separate target).
 test:
-  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} CODE_SIGNING_ALLOWED=NO test -skip-testing:{{ui_test_target}}
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" test -only-testing:MuraloomTests
 
 # Run unit tests with code coverage and enforce CI's minimum.
 coverage:
   rm -rf /tmp/muraloom_tests.xcresult
-  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:MuraloomTests
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" test -only-testing:MuraloomTests
   bash bin/coverage-gate.sh /tmp/muraloom_tests.xcresult {{min_unit_test_coverage_percent}} {{scheme}}
 
 # Run unit tests with code coverage and print the coverage report (no minimum enforced).
 coverage-report:
   rm -rf /tmp/muraloom_tests.xcresult
-  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO test -only-testing:MuraloomTests
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_test}} -resultBundlePath /tmp/muraloom_tests.xcresult -enableCodeCoverage YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" test -only-testing:MuraloomTests
   bash bin/coverage-gate.sh /tmp/muraloom_tests.xcresult 0 {{scheme}}
 
 # Run UI tests (uses a hermetic in-app UI testing mode; no network/auth required).
 ui-test:
   # UI tests require a runnable test runner app. Ad-hoc sign it, but strip entitlements so this works without a dev cert.
   rm -rf {{derived_data_ui_test}}
-  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_ui_test}} CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="-" CODE_SIGN_ENTITLEMENTS="" test -only-testing:{{ui_test_target}}
+  xcodebuild -scheme {{scheme}} -destination '{{destination}}' -derivedDataPath {{derived_data_ui_test}} -resultBundlePath /tmp/muraloom_ui_tests.xcresult CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="-" CODE_SIGN_ENTITLEMENTS="" test -only-testing:{{ui_test_target}}
+
+# Local CI parity: same order/methodology as GitHub CI for tests and coverage.
+ci-local:
+  just coverage
+  just ui-test
 
 # Run unit + UI tests.
 test-all:
