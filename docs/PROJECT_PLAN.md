@@ -145,9 +145,22 @@ Non-goals for MVP (explicit):
 
 Goal: a workable experience when Graph is temporarily unavailable.
 
-- Cache a “last known good” wallpaper image (and possibly a small ring buffer).
-- If a wallpaper update fails (offline, token issue, Graph errors), fall back to cached images instead of failing silently.
-- UX: surface an “offline / last updated” status and guidance to re-auth / retry.
+Detailed spec: `docs/OFFLINE_UX_PLAN.md` (lean, decision-complete).
+
+- Update flow policy:
+  - In normal operation, attempt network first.
+  - On offline-class transport failure, fall back to cached wallpapers.
+  - On network success, continue selecting from the full live album.
+- Auth/error policy:
+  - Offline-class failures do **not** sign the user out.
+  - Re-auth guidance is reserved for explicit auth-invalid signals (for example, invalid refresh token / repeated 401 invalid-token responses with working transport).
+- Retry/cooldown policy:
+  - After offline-class failure, enter a short cooldown window to avoid repeated auth/network churn.
+  - Manual “retry online now” bypasses cooldown.
+- Sync/cache policy:
+  - “Sync” is metadata-first (IDs/cTags/dimensions), then prefetch missing/stale items up to `targetCount`.
+  - Track cache health via `readyCount` and `targetCount`.
+  - Avoid continuous connectivity pinging/probing.
 
 ### Phase 5 — Album write operations (planned; post-MVP / separate)
 

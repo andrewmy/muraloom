@@ -47,5 +47,7 @@ This document describes user-facing outcomes. For implementation details, see `d
     - Phase 2 — Albums API (Graph bundles)
     - Phase 3 — UI update (albums instead of folders)
 *   **Post-MVP stories** map primarily to:
-    - Phase 4 — Testing & hardening
-    - Follow-on phases not yet written (menu-bar UX polish, caching/history, launch-at-login, multi-monitor).
+    - Phase 4 — Offline mode (see `docs/OFFLINE_UX_PLAN.md`)
+    - Phase 5 — Album write operations
+    - Phase 6 — Wallpaper suitability filtering
+    - Phase 7 — Testing & hardening

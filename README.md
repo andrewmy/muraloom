@@ -160,4 +160,5 @@ RAW decoding is optional and off by default. To enable it, follow `docs/LIBRAW.m
 ## Contributing
 
 - Roadmap / implementation notes: `docs/PROJECT_PLAN.md`
+- Offline UX spec (planned implementation): `docs/OFFLINE_UX_PLAN.md`
 - Repo guidance (contributors/Codex): `AGENTS.md`
