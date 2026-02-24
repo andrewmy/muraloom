@@ -1,6 +1,10 @@
 import Foundation
 
 class PhotosServiceModel: ObservableObject, PhotosService {
+    func scanAlbum(inAlbumId albumId: String) async throws -> AlbumScanResult {
+        preconditionFailure("PhotosServiceModel.scanAlbum(inAlbumId:) must be overridden")
+    }
+
     func listAlbums() async throws -> [OneDriveAlbum] {
         preconditionFailure("PhotosServiceModel.listAlbums() must be overridden")
     }
@@ -10,7 +14,7 @@ class PhotosServiceModel: ObservableObject, PhotosService {
     }
 
     func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
-        preconditionFailure("PhotosServiceModel.searchPhotos(inAlbumId:) must be overridden")
+        try await scanAlbum(inAlbumId: albumId).usableItems
     }
 
     func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum? {
@@ -114,6 +118,10 @@ final class UITestPhotosService: PhotosServiceModel {
 
     override func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
         Self.items
+    }
+
+    override func scanAlbum(inAlbumId albumId: String) async throws -> AlbumScanResult {
+        AlbumScanResult(usableItems: Self.items, nonUsableExclusions: [], scannedAt: Date())
     }
 
     override func probeAlbumUsablePhotoCount(albumId: String) async throws -> Int {

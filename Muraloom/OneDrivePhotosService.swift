@@ -80,28 +80,37 @@ final class OneDrivePhotosService: PhotosServiceModel {
         return OneDriveAlbum(id: item.id, webUrl: item.webUrl, name: item.name)
     }
 
-    override func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
+    override func scanAlbum(inAlbumId albumId: String) async throws -> AlbumScanResult {
         let expandedChildren: DriveItemExpandedChildrenResponse = try await get(
             "/me/drive/items/\(albumId)",
             query: [
                 .init(name: "$select", value: "id"),
-            .init(
-                name: "$expand",
-                value: "children($select=id,name,webUrl,file,image,photo,cTag,remoteItem)"
-            ),
+                .init(
+                    name: "$expand",
+                    value: "children($select=id,name,webUrl,file,image,photo,cTag,deleted,remoteItem)"
+                ),
             ]
         )
 
-        var results = Self.mediaItems(from: expandedChildren.children ?? [])
+        let supportsRaw = LibRawDecoder.isAvailable()
+        var classifiedItems = Self.classifyDriveItems(from: expandedChildren.children ?? [], supportsRaw: supportsRaw)
 
         if let nextLink = expandedChildren.childrenNextLink, let nextURL = URL(string: nextLink) {
             let additional = try await pagedDriveItems(startURL: nextURL) { page in
-                Self.mediaItems(from: page.value)
+                Self.classifyDriveItems(from: page.value, supportsRaw: supportsRaw)
             }
-            results.append(contentsOf: additional)
+            classifiedItems.append(contentsOf: additional)
         }
 
-        return results
+        return AlbumScanResult(
+            usableItems: classifiedItems.compactMap(\.usableItem),
+            nonUsableExclusions: classifiedItems.compactMap(\.excludedItem),
+            scannedAt: Date()
+        )
+    }
+
+    override func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
+        try await scanAlbum(inAlbumId: albumId).usableItems
     }
 
     override func probeAlbumUsablePhotoCount(albumId: String) async throws -> Int {
@@ -112,11 +121,16 @@ final class OneDrivePhotosService: PhotosServiceModel {
                 .init(
                     name: "$expand",
                     // Fast sample only: first page from expanded children.
-                    value: "children($select=id,name,file,image,photo,cTag,remoteItem)"
+                    value: "children($select=id,name,file,image,photo,cTag,deleted,remoteItem)"
                 ),
             ]
         )
-        return Self.mediaItems(from: expandedChildren.children ?? []).count
+        return Self.classifyDriveItems(
+            from: expandedChildren.children ?? [],
+            supportsRaw: LibRawDecoder.isAvailable()
+        )
+        .compactMap(\.usableItem)
+        .count
     }
 
     override func downloadImageData(for item: MediaItem) async throws -> Data {
@@ -155,7 +169,9 @@ final class OneDrivePhotosService: PhotosServiceModel {
         let accessToken = try await authService.validAccessToken()
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
         let (data, response) = try await session.data(for: request)
         let http = response as? HTTPURLResponse
@@ -206,46 +222,103 @@ final class OneDrivePhotosService: PhotosServiceModel {
         return drive.id
     }
 
-    private static func mediaItems(from driveItems: [DriveItem]) -> [MediaItem] {
-        let supportsRaw = LibRawDecoder.isAvailable()
-        return driveItems.compactMap { item -> MediaItem? in
-            let effectiveName = item.remoteItem?.name ?? item.name
-            let lowercasedName = effectiveName?.lowercased() ?? ""
-            let effectiveFile = item.file ?? item.remoteItem?.file
-            let effectiveImage = item.image ?? item.remoteItem?.image
-            let effectivePhoto = item.photo ?? item.remoteItem?.photo
-            let mime = effectiveFile?.mimeType ?? ""
+    private struct ClassifiedDriveItem {
+        let usableItem: MediaItem?
+        let excludedItem: ExcludedMediaItem?
+    }
 
-            let isRaw =
-                lowercasedName.hasSuffix(".arw")
-                || lowercasedName.hasSuffix(".dng")
-                || lowercasedName.hasSuffix(".cr2")
-                || lowercasedName.hasSuffix(".nef")
-                || lowercasedName.hasSuffix(".raf")
-                || lowercasedName.hasSuffix(".orf")
-                || lowercasedName.hasSuffix(".rw2")
+    private static func classifyDriveItems(from driveItems: [DriveItem], supportsRaw: Bool) -> [ClassifiedDriveItem] {
+        driveItems.map { classifyDriveItem($0, supportsRaw: supportsRaw) }
+    }
 
-            let isImage =
-                mime.hasPrefix("image/")
-                || effectiveImage != nil
-                || effectivePhoto != nil
-                || isRaw
-                || lowercasedName.hasSuffix(".jpg")
-                || lowercasedName.hasSuffix(".jpeg")
-                || lowercasedName.hasSuffix(".png")
-                || lowercasedName.hasSuffix(".heic")
+    private static func classifyDriveItem(_ item: DriveItem, supportsRaw: Bool) -> ClassifiedDriveItem {
+        if item.deleted != nil || item.remoteItem?.deleted != nil {
+            return ClassifiedDriveItem(usableItem: nil, excludedItem: nil)
+        }
 
-            guard isImage, (isRaw == false || supportsRaw) else { return nil }
-            return MediaItem(
-                id: item.id,
-                downloadUrl: (item.downloadUrl ?? item.remoteItem?.downloadUrl).flatMap(URL.init(string:)),
-                pixelWidth: effectiveImage?.width,
-                pixelHeight: effectiveImage?.height,
-                name: effectiveName,
-                mimeType: effectiveFile?.mimeType,
-                cTag: item.cTag ?? item.remoteItem?.cTag
+        let effectiveName = (item.remoteItem?.name ?? item.name)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = (effectiveName?.isEmpty == false) ? effectiveName! : item.id
+        let lowercasedName = displayName.lowercased()
+        let effectiveFile = item.file ?? item.remoteItem?.file
+        let effectiveImage = item.image ?? item.remoteItem?.image
+        let effectivePhoto = item.photo ?? item.remoteItem?.photo
+        let effectiveWebUrl = item.webUrl ?? item.remoteItem?.webUrl
+        let mime = effectiveFile?.mimeType ?? ""
+
+        let isRaw = Self.isRawFilename(lowercasedName)
+        let isVideo = Self.isVideoMedia(lowercasedName: lowercasedName, mime: mime)
+        let isImage =
+            mime.hasPrefix("image/")
+            || effectiveImage != nil
+            || effectivePhoto != nil
+            || isRaw
+            || lowercasedName.hasSuffix(".jpg")
+            || lowercasedName.hasSuffix(".jpeg")
+            || lowercasedName.hasSuffix(".png")
+            || lowercasedName.hasSuffix(".heic")
+
+        if isImage == false {
+            guard isVideo else {
+                // Ignore non-media sidecars/artifacts that can appear in album listings.
+                return ClassifiedDriveItem(usableItem: nil, excludedItem: nil)
+            }
+            return ClassifiedDriveItem(
+                usableItem: nil,
+                excludedItem: ExcludedMediaItem(
+                    id: item.id,
+                    name: displayName,
+                    webUrl: effectiveWebUrl,
+                    reason: .notImageMedia
+                )
             )
         }
+
+        if isRaw, supportsRaw == false {
+            return ClassifiedDriveItem(
+                usableItem: nil,
+                excludedItem: ExcludedMediaItem(
+                    id: item.id,
+                    name: displayName,
+                    webUrl: effectiveWebUrl,
+                    reason: .rawUnsupported
+                )
+            )
+        }
+
+        return ClassifiedDriveItem(
+            usableItem: MediaItem(
+                id: item.id,
+                downloadUrl: (item.downloadUrl ?? item.remoteItem?.downloadUrl).flatMap(URL.init(string:)),
+                webUrl: effectiveWebUrl,
+                pixelWidth: effectiveImage?.width,
+                pixelHeight: effectiveImage?.height,
+                name: displayName,
+                mimeType: effectiveFile?.mimeType,
+                cTag: item.cTag ?? item.remoteItem?.cTag
+            ),
+            excludedItem: nil
+        )
+    }
+
+    private static func isRawFilename(_ lowercasedName: String) -> Bool {
+        lowercasedName.hasSuffix(".arw")
+            || lowercasedName.hasSuffix(".dng")
+            || lowercasedName.hasSuffix(".cr2")
+            || lowercasedName.hasSuffix(".nef")
+            || lowercasedName.hasSuffix(".raf")
+            || lowercasedName.hasSuffix(".orf")
+            || lowercasedName.hasSuffix(".rw2")
+    }
+
+    private static func isVideoMedia(lowercasedName: String, mime: String) -> Bool {
+        if mime.hasPrefix("video/") { return true }
+        return lowercasedName.hasSuffix(".mp4")
+            || lowercasedName.hasSuffix(".mov")
+            || lowercasedName.hasSuffix(".m4v")
+            || lowercasedName.hasSuffix(".avi")
+            || lowercasedName.hasSuffix(".mkv")
+            || lowercasedName.hasSuffix(".wmv")
+            || lowercasedName.hasSuffix(".hevc")
     }
 
     private static func isAlbumCandidateStrict(_ item: DriveItem) -> Bool {
@@ -368,7 +441,9 @@ final class OneDrivePhotosService: PhotosServiceModel {
         while let url = nextURL {
             let accessToken = try await authService.validAccessToken()
             var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
             let (data, response) = try await session.data(for: request)
             let http = response as? HTTPURLResponse
@@ -405,6 +480,7 @@ private struct DriveItem: Decodable {
     let file: FileFacet?
     let image: ImageFacet?
     let photo: PhotoFacet?
+    let deleted: DeletedFacet?
     let remoteItem: RemoteItemFacet?
     let downloadUrl: String?
 
@@ -418,6 +494,7 @@ private struct DriveItem: Decodable {
         case file
         case image
         case photo
+        case deleted
         case remoteItem
         case downloadUrl = "@microsoft.graph.downloadUrl"
     }
@@ -426,19 +503,23 @@ private struct DriveItem: Decodable {
 private struct RemoteItemFacet: Decodable {
     let id: String?
     let name: String?
+    let webUrl: URL?
     let cTag: String?
     let file: FileFacet?
     let image: ImageFacet?
     let photo: PhotoFacet?
+    let deleted: DeletedFacet?
     let downloadUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case name
+        case webUrl
         case cTag
         case file
         case image
         case photo
+        case deleted
         case downloadUrl = "@microsoft.graph.downloadUrl"
     }
 }
@@ -464,6 +545,8 @@ private struct ImageFacet: Decodable {
 }
 
 private struct PhotoFacet: Decodable {}
+
+private struct DeletedFacet: Decodable {}
 
 private struct DriveItemExpandedChildrenResponse: Decodable {
     let children: [DriveItem]?

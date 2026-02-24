@@ -48,6 +48,11 @@ final class WallpaperManager: ObservableObject {
         let filteredIndex: Int?
     }
 
+    struct FilteredMediaResults {
+        let eligibleItems: [MediaItem]
+        let excludedItems: [ExcludedMediaItem]
+    }
+
     nonisolated static func buildWallpaperCandidates(
         filteredItems: [MediaItem],
         maxAttempts: Int,
@@ -242,7 +247,12 @@ final class WallpaperManager: ObservableObject {
 
             updateStage = .filtering
             settings.albumRawPictureCount = mediaItems.count
-            let filteredItems = filterMediaItems(mediaItems)
+            let filtered = Self.filteredMediaItems(
+                from: mediaItems,
+                minimumPictureWidth: settings.minimumPictureWidth,
+                horizontalPhotosOnly: settings.horizontalPhotosOnly
+            )
+            let filteredItems = filtered.eligibleItems
             settings.albumPictureCount = filteredItems.count
             settings.showNoPicturesWarning = filteredItems.isEmpty
             if filteredItems.isEmpty {
@@ -255,7 +265,7 @@ final class WallpaperManager: ObservableObject {
 
             let currentWallpaperURL: URL? = {
                 guard let screen = NSScreen.screens.first else { return nil }
-                guard let url = try? NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
+                guard let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
                 let standardized = url.standardizedFileURL
                 let filename = standardized.lastPathComponent
                 guard filename.hasPrefix("wallpaper-"), filename.hasSuffix(".jpg") else { return nil }
@@ -415,25 +425,52 @@ final class WallpaperManager: ObservableObject {
         minimumPictureWidth: Double,
         horizontalPhotosOnly: Bool
     ) -> [MediaItem] {
-        items.filter { item in
+        filteredMediaItems(
+            from: items,
+            minimumPictureWidth: minimumPictureWidth,
+            horizontalPhotosOnly: horizontalPhotosOnly
+        ).eligibleItems
+    }
+
+    nonisolated static func filteredMediaItems(
+        from items: [MediaItem],
+        minimumPictureWidth: Double,
+        horizontalPhotosOnly: Bool
+    ) -> FilteredMediaResults {
+        var eligibleItems: [MediaItem] = []
+        var excludedItems: [ExcludedMediaItem] = []
+        let minimumWidthPx = Int(max(0, minimumPictureWidth.rounded(.up)))
+
+        for item in items {
+            let displayName = item.displayName
             if minimumPictureWidth > 0, let width = item.pixelWidth, Double(width) < minimumPictureWidth {
-                return false
+                excludedItems.append(
+                    ExcludedMediaItem(
+                        id: item.id,
+                        name: displayName,
+                        webUrl: item.webUrl,
+                        reason: .belowMinimumWidth(minimumWidth: minimumWidthPx)
+                    )
+                )
+                continue
             }
 
             if horizontalPhotosOnly, let width = item.pixelWidth, let height = item.pixelHeight, width < height {
-                return false
+                excludedItems.append(
+                    ExcludedMediaItem(
+                        id: item.id,
+                        name: displayName,
+                        webUrl: item.webUrl,
+                        reason: .portraitWhenHorizontalOnly
+                    )
+                )
+                continue
             }
 
-            return true
+            eligibleItems.append(item)
         }
-    }
 
-    private func filterMediaItems(_ items: [MediaItem]) -> [MediaItem] {
-        Self.eligibleMediaItems(
-            from: items,
-            minimumPictureWidth: settings.minimumPictureWidth,
-            horizontalPhotosOnly: settings.horizontalPhotosOnly
-        )
+        return FilteredMediaResults(eligibleItems: eligibleItems, excludedItems: excludedItems)
     }
 
     private func persistLastSetWallpaperItem(_ item: MediaItem) {

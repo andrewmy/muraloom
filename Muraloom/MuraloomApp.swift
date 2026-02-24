@@ -108,14 +108,24 @@ struct MuraloomApp: App {
 }
 
 protocol PhotosService {
+    func scanAlbum(inAlbumId albumId: String) async throws -> AlbumScanResult
     func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem]
     func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum?
     func downloadImageData(for item: MediaItem) async throws -> Data
 }
 
+extension PhotosService {
+    func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
+        try await scanAlbum(inAlbumId: albumId).usableItems
+    }
+}
+
 // Dummy service to keep the app building until OneDrive integration is implemented.
 final class DummyOneDrivePhotosService: PhotosService {
-    func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] { [] }
+    func scanAlbum(inAlbumId albumId: String) async throws -> AlbumScanResult {
+        AlbumScanResult(usableItems: [], nonUsableExclusions: [], scannedAt: Date())
+    }
+
     func verifyAlbumExists(albumId: String) async throws -> OneDriveAlbum? { nil }
     func downloadImageData(for item: MediaItem) async throws -> Data { throw URLError(.unsupportedURL) }
 }
@@ -124,6 +134,7 @@ final class DummyOneDrivePhotosService: PhotosService {
 struct MediaItem: Codable, Identifiable {
     var id: String
     var downloadUrl: URL?
+    var webUrl: URL? = nil
     var pixelWidth: Int?
     var pixelHeight: Int?
     var name: String?

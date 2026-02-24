@@ -200,6 +200,52 @@ struct MuraloomTests {
         }
     }
 
+    @Test func scanAlbumIncludesNonUsableExclusionDetails() async throws {
+        let (session, handlerId) = makeSession { request in
+            if request.url?.path.hasSuffix("/me/drive/items/a1") == true {
+                let json = """
+                {
+                  "id": "a1",
+                  "children": [
+                    { "id": "jpg1", "name": "one.jpg", "webUrl": "https://photos.onedrive.com/jpg1", "file": { "mimeType": "image/jpeg" }, "image": { "width": 4000, "height": 3000 } },
+                    { "id": "raw1", "name": "three.ARW", "webUrl": "https://photos.onedrive.com/raw1", "file": { "mimeType": "image/tiff" } },
+                    { "id": "vid1", "name": "nope.mp4", "webUrl": "https://photos.onedrive.com/vid1", "file": { "mimeType": "video/mp4" } },
+                    { "id": "sidecar1", "name": "asset.aea", "webUrl": "https://photos.onedrive.com/sidecar1", "file": { "mimeType": "application/octet-stream" } },
+                    { "id": "deleted1", "name": "removed.jpg", "webUrl": "https://photos.onedrive.com/deleted1", "file": { "mimeType": "image/jpeg" }, "image": { "width": 3000, "height": 2000 }, "deleted": {} },
+                    { "id": "shortcut-deleted", "name": "shortcut removed", "remoteItem": { "id": "remote-deleted", "name": "gone.jpg", "file": { "mimeType": "image/jpeg" }, "image": { "width": 4032, "height": 3024 }, "deleted": {} } }
+                  ]
+                }
+                """
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data(json.utf8)
+                )
+            }
+
+            throw URLError(.badURL)
+        }
+        defer { MockURLProtocol.removeHandler(for: handlerId) }
+
+        let service = OneDrivePhotosService(authService: TestTokenProvider(), session: session)
+        let scan = try await service.scanAlbum(inAlbumId: "a1")
+
+        #expect(scan.usableItems.contains(where: { $0.id == "jpg1" }))
+        #expect(scan.nonUsableExclusions.contains(where: { $0.id == "vid1" && $0.reason == .notImageMedia }))
+        #expect(scan.nonUsableExclusions.contains(where: { $0.id == "sidecar1" }) == false)
+        #expect(scan.usableItems.contains(where: { $0.id == "deleted1" }) == false)
+        #expect(scan.nonUsableExclusions.contains(where: { $0.id == "deleted1" }) == false)
+        #expect(scan.usableItems.contains(where: { $0.id == "shortcut-deleted" }) == false)
+        #expect(scan.nonUsableExclusions.contains(where: { $0.id == "shortcut-deleted" }) == false)
+
+        if LibRawDecoder.isAvailable() {
+            #expect(scan.usableItems.contains(where: { $0.id == "raw1" }))
+            #expect(scan.nonUsableExclusions.contains(where: { $0.id == "raw1" }) == false)
+        } else {
+            #expect(scan.usableItems.contains(where: { $0.id == "raw1" }) == false)
+            #expect(scan.nonUsableExclusions.contains(where: { $0.id == "raw1" && $0.reason == .rawUnsupported }))
+        }
+    }
+
     @Test func searchPhotosTreatsRemoteItemImageAsUsable() async throws {
         let (session, handlerId) = makeSession { request in
             if request.url?.path.hasSuffix("/me/drive/items/a1") == true {

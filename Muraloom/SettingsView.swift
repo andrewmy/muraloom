@@ -22,6 +22,8 @@ struct SettingsView: View {
     @State private var didValidateStoredSelection: Bool = false
     @State private var didAutoLoadAlbums: Bool = false
     @State private var selectedAlbumUsableCount: Int?
+    @State private var showExcludedMediaDetails: Bool = false
+    @State private var lastScanDiagnostics: AlbumScanDiagnostics?
     @State private var oneDriveError: String?
 #if DEBUG
     @State private var oneDriveDebugInfo: String?
@@ -75,6 +77,7 @@ struct SettingsView: View {
                         settings.albumPictureCount = 0
                         settings.showNoPicturesWarning = false
                         selectedAlbumUsableCount = nil
+                        lastScanDiagnostics = nil
                     } label: {
                         Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                     }
@@ -199,6 +202,12 @@ struct SettingsView: View {
                         if settings.albumRawPictureCount > settings.albumPictureCount {
                             Text("Filtered out by size/orientation settings: \(settings.albumRawPictureCount - settings.albumPictureCount)")
                                 .foregroundStyle(.secondary)
+                        }
+                        if let diagnostics = lastScanDiagnostics, diagnostics.totalExclusions > 0 {
+                            Button("View Excluded Photos…") {
+                                showExcludedMediaDetails = true
+                            }
+                            .accessibilityIdentifier("albums.excludedDetails")
                         }
                         if settings.albumPictureCount > 0 {
                             HStack(spacing: 6) {
@@ -367,18 +376,27 @@ struct SettingsView: View {
 
 	                                    Button("Check Album Photos (full scan)") {
 	                                        oneDriveError = nil
+	                                        lastScanDiagnostics = nil
+	                                        let requestedAlbumId = albumId
 	                                        Task {
 	                                            do {
-	                                                let photos = try await photosService.searchPhotos(inAlbumId: albumId)
-	                                                let eligible = WallpaperManager.eligibleMediaItems(
-	                                                    from: photos,
+	                                                let scan = try await photosService.scanAlbum(inAlbumId: requestedAlbumId)
+	                                                guard settings.selectedAlbumId == requestedAlbumId else { return }
+	                                                let filtered = WallpaperManager.filteredMediaItems(
+	                                                    from: scan.usableItems,
 	                                                    minimumPictureWidth: settings.minimumPictureWidth,
 	                                                    horizontalPhotosOnly: settings.horizontalPhotosOnly
 	                                                )
-	                                                settings.albumRawPictureCount = photos.count
-	                                                settings.albumPictureCount = eligible.count
-	                                                settings.showNoPicturesWarning = eligible.isEmpty
+	                                                settings.albumRawPictureCount = scan.usableItems.count
+	                                                settings.albumPictureCount = filtered.eligibleItems.count
+	                                                settings.showNoPicturesWarning = filtered.eligibleItems.isEmpty
+	                                                lastScanDiagnostics = AlbumScanDiagnostics(
+	                                                    scannedAt: scan.scannedAt,
+	                                                    wallpaperFilterExclusions: filtered.excludedItems,
+	                                                    nonUsableExclusions: scan.nonUsableExclusions
+	                                                )
 	                                            } catch {
+	                                                guard settings.selectedAlbumId == requestedAlbumId else { return }
 	                                                oneDriveError = error.localizedDescription
 	                                            }
 	                                        }
@@ -545,6 +563,26 @@ struct SettingsView: View {
         .task(id: authService.isSignedIn) {
             await startupRefreshIfNeeded()
         }
+        .onChange(of: settings.selectedAlbumId) { _, _ in
+            lastScanDiagnostics = nil
+        }
+        .onChange(of: settings.minimumPictureWidth) { _, _ in
+            lastScanDiagnostics = nil
+        }
+        .onChange(of: settings.horizontalPhotosOnly) { _, _ in
+            lastScanDiagnostics = nil
+        }
+        .sheet(isPresented: $showExcludedMediaDetails) {
+            if let diagnostics = lastScanDiagnostics {
+                ExcludedMediaDiagnosticsView(
+                    diagnostics: diagnostics,
+                    albumName: settings.selectedAlbumName
+                )
+            } else {
+                Text("No excluded media from the latest scan.")
+                    .padding(20)
+            }
+        }
     }
 
     @MainActor
@@ -553,6 +591,7 @@ struct SettingsView: View {
             didValidateStoredSelection = false
             didAutoLoadAlbums = false
             albums = []
+            lastScanDiagnostics = nil
             return
         }
 
@@ -610,6 +649,7 @@ struct SettingsView: View {
                 settings.albumPictureCount = 0
                 settings.albumRawPictureCount = 0
                 settings.showNoPicturesWarning = false
+                lastScanDiagnostics = nil
             }
         } catch OneDriveAuthError.notSignedIn {
             didValidateStoredSelection = false
@@ -618,6 +658,7 @@ struct SettingsView: View {
             settings.albumPictureCount = 0
             settings.albumRawPictureCount = 0
             settings.showNoPicturesWarning = false
+            lastScanDiagnostics = nil
         } catch {
             oneDriveError = error.localizedDescription
         }
@@ -632,6 +673,7 @@ struct SettingsView: View {
         settings.albumRawPictureCount = 0
         settings.showNoPicturesWarning = false
         selectedAlbumUsableCount = nil
+        lastScanDiagnostics = nil
         wallpaperManager.startWallpaperUpdates()
 
         if shouldProbePhotos {

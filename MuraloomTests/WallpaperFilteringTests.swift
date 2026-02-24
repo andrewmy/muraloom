@@ -34,4 +34,24 @@ struct WallpaperFilteringTests {
 
         #expect(eligible.map(\.id) == ["keep", "unknown"])
     }
+
+    @Test func filteredItemsExposeReasonedExclusions() {
+        let items = [
+            item("small", width: 3000, height: 2000),
+            item("portrait", width: 5500, height: 6500),
+        ]
+
+        let filtered = WallpaperManager.filteredMediaItems(
+            from: items,
+            minimumPictureWidth: 5000,
+            horizontalPhotosOnly: true
+        )
+
+        #expect(filtered.eligibleItems.isEmpty)
+        #expect(filtered.excludedItems.count == 2)
+        #expect(filtered.excludedItems.map(\.reason) == [
+            .belowMinimumWidth(minimumWidth: 5000),
+            .portraitWhenHorizontalOnly,
+        ])
+    }
 }
