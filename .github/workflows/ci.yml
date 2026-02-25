@@ -6,7 +6,6 @@ on:
   workflow_dispatch:
 
 env:
-  # Keep these in one place so we can bump the supported macOS baseline easily.
   TARGET_MACOS_VERSION: "15.5"
   # Keep this conservative; raise over time as tests improve.
   MIN_UNIT_TEST_COVERAGE_PERCENT: "48"
@@ -19,10 +18,12 @@ jobs:
     # Pin runner to keep Homebrew dylib compatibility stable for distribution.
     # We target macOS >= TARGET_MACOS_VERSION, so ensure Homebrew bottles are built with minos <= that.
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Runner info
         run: |
@@ -214,3 +215,27 @@ jobs:
         with:
           name: Muraloom-Release-arm64
           path: build/artifacts/Muraloom-Release-arm64.zip
+
+      - name: Upload Release zip to GitHub Release (latest)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ASSET="build/artifacts/Muraloom-Release-arm64.zip"
+
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest \
+              --title "Latest" \
+              --notes "Build from ${GITHUB_SHA}." \
+              --target "${GITHUB_SHA}" \
+              --latest
+          else
+            gh release create latest \
+              --title "Latest" \
+              --notes "Build from ${GITHUB_SHA}." \
+              --target "${GITHUB_SHA}" \
+              --latest
+          fi
+
+          gh release upload latest "${ASSET}" --clobber
