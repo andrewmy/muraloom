@@ -33,6 +33,26 @@ struct SettingsView: View {
         Double(WallpaperImageTranscoder.maxRecommendedDisplayPixelWidth())
     }
 
+    private var sourceStatusText: String {
+        if wallpaperManager.isUsingCachedFallback {
+            return "Cached fallback"
+        }
+        if let cooldownUntil = wallpaperManager.offlineCooldownUntil, cooldownUntil > Date() {
+            return "Offline (no cache)"
+        }
+        return "Live"
+    }
+
+    private var shouldShowRetryOnlineNow: Bool {
+        if wallpaperManager.isUsingCachedFallback {
+            return true
+        }
+        guard let cooldownUntil = wallpaperManager.offlineCooldownUntil else {
+            return false
+        }
+        return cooldownUntil > Date()
+    }
+
     private func stageText(_ stage: WallpaperManager.WallpaperUpdateStage) -> String {
         switch stage {
         case .idle:
@@ -273,6 +293,17 @@ struct SettingsView: View {
                 .help(canChangeNow ? "" : (authService.isSignedIn ? "Select an album to enable wallpaper changes." : "Sign in to enable wallpaper changes."))
                 .accessibilityIdentifier("wallpaper.changeNow")
 
+                if shouldShowRetryOnlineNow {
+                    Button {
+                        wallpaperManager.retryOnlineNow()
+                    } label: {
+                        Label("Retry Online Now", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(wallpaperManager.isUpdating || canChangeNow == false)
+                    .help("Bypasses offline cooldown and forces an online attempt immediately.")
+                    .accessibilityIdentifier("wallpaper.retryOnline")
+                }
+
                 Toggle("Pick Randomly", isOn: $settings.pickRandomly)
                     .accessibilityIdentifier("wallpaper.pickRandomly")
 
@@ -496,6 +527,48 @@ struct SettingsView: View {
                 }
 
                 HStack {
+                    Text("Source")
+                    Spacer()
+                    Text(sourceStatusText)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("status.source")
+
+                HStack {
+                    Text("Cache")
+                    Spacer()
+                    Text("\(wallpaperManager.cacheReadyCount)/\(wallpaperManager.cacheTargetCount)")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("status.cache")
+                }
+
+                HStack {
+                    Text("Last sync")
+                    Spacer()
+                    if let lastSyncAt = wallpaperManager.lastSyncAt {
+                        Text(lastSyncAt, style: .relative)
+                            .foregroundStyle(.secondary)
+                            .help(lastSyncAt.formatted(date: .abbreviated, time: .shortened))
+                            .accessibilityIdentifier("status.lastSync")
+                    } else {
+                        Text("—")
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("status.lastSync")
+                    }
+                }
+
+                if let cooldownUntil = wallpaperManager.offlineCooldownUntil, cooldownUntil > Date() {
+                    HStack {
+                        Text("Offline cooldown")
+                        Spacer()
+                        Text(cooldownUntil, style: .relative)
+                            .foregroundStyle(.secondary)
+                            .help(cooldownUntil.formatted(date: .abbreviated, time: .shortened))
+                    }
+                }
+
+                HStack {
                     Text("Last changed")
                     Spacer()
                     if let last = wallpaperManager.lastSuccessfulUpdate {
@@ -524,24 +597,25 @@ struct SettingsView: View {
                         Text("Off")
                             .foregroundStyle(.secondary)
                     } else {
-                        let interval = WallpaperManager.intervalSeconds(for: settings.changeFrequency)
-                        let due = WallpaperManager.computeNextDueDate(
-                            now: Date(),
-                            lastSuccessfulWallpaperUpdate: settings.lastSuccessfulWallpaperUpdate,
-                            intervalSeconds: interval,
-                            hasSelectedAlbum: true,
-                            isPaused: false,
-                            lastAttemptDate: nil
-                        )
-                        if let due {
-                            Text(due, style: .relative)
+                        if let nextScheduled = wallpaperManager.nextScheduledUpdate {
+                            Text(nextScheduled, style: .relative)
                                 .foregroundStyle(.secondary)
-                                .help(due.formatted(date: .abbreviated, time: .shortened))
+                                .help(nextScheduled.formatted(date: .abbreviated, time: .shortened))
                         } else {
                             Text("—")
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+
+                if let syncError = wallpaperManager.lastSyncError, !syncError.isEmpty {
+                    Text("Last sync error: \(syncError)")
+                        .font(.system(.caption))
+                        .foregroundStyle(.orange)
+                        .textSelection(.enabled)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("status.lastSyncError")
                 }
 
                 if let error = wallpaperManager.lastUpdateError, !error.isEmpty {
@@ -551,6 +625,7 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("status.lastError")
                 }
             }
             header: {

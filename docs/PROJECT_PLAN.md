@@ -141,11 +141,11 @@ Non-goals for MVP (explicit):
 - Do **not** change wallpaper automatically on app launch (user should trigger manually or wait for next interval).
 - Do **not** implement “different wallpaper per display” in MVP (post-MVP).
 
-### Phase 4 — Offline mode (planned; post-MVP)
+### Phase 4 — Offline mode (done)
 
 Goal: a workable experience when Graph is temporarily unavailable.
 
-Detailed spec: `docs/OFFLINE_UX_PLAN.md` (lean, decision-complete).
+Detailed behavior/spec is captured in this section.
 
 - Update flow policy:
   - In normal operation, attempt network first.
@@ -161,6 +161,25 @@ Detailed spec: `docs/OFFLINE_UX_PLAN.md` (lean, decision-complete).
   - “Sync” is metadata-first (IDs/cTags/dimensions), then prefetch missing/stale items up to `targetCount`.
   - Track cache health via `readyCount` and `targetCount`.
   - Avoid continuous connectivity pinging/probing.
+
+Current implementation progress (2026-02-25):
+- Done in `WallpaperManager`:
+  - Offline transport classification + fallback cooldown.
+  - Cache index persistence in Application Support (`itemId`, `cTag`, `fileURL`, `lastUsedAt`).
+  - Retry-online bypass hook in manager (`retryOnlineNow()`).
+  - Published cache/sync/offline status fields for UI consumption.
+  - Incremental cache prefetch on successful live sync.
+- Done in UI:
+  - Settings status rows for source/cache/last-sync and sync/update errors.
+  - Menu bar status lines for source/cache/last-sync and sync/update errors.
+  - Manual `Retry online now` action in Settings + menu bar (visible only when offline fallback/cooldown is active).
+  - Row-level combined accessibility element for `status.source` to support stable UI-test assertions.
+  - UI test helper now validates status text via accessibility `label` or `value` (macOS AX behavior).
+  - UI-test cache directory reset moved to startup-only in composition root so warm-cache fallback tests can persist cache files between updates.
+- Completed (2026-02-25):
+  - Offline-focused unit coverage in `OfflineWallpaperManagerTests` (fallback, cooldown, retry, auth classification).
+  - Offline-focused UI coverage in `MuraloomUITests` (warm cache fallback, no-cache guidance, retry-to-live recovery).
+  - Full local verification: `just test` + `just ui-test` both passing.
 
 ### Phase 5 — Album write operations (planned; post-MVP / separate)
 

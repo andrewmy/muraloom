@@ -93,6 +93,49 @@ final class MuraloomUITests: XCTestCase {
     }
 
     @MainActor
+    private func waitForLabelContains(
+        _ app: XCUIApplication,
+        id: String,
+        expectedText: String,
+        timeout: TimeInterval = 6,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        _ = requireElement(app, id: id, timeout: timeout, file: file, line: line)
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let target = element(app, id: id)
+            let text = accessibilityText(target)
+            if text.contains(expectedText) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+
+        let target = element(app, id: id)
+        XCTFail(
+            "Expected '\(id)' to contain '\(expectedText)', got label='\(target.label)' value='\(String(describing: target.value))'",
+            file: file,
+            line: line
+        )
+    }
+
+    @MainActor
+    private func accessibilityText(_ element: XCUIElement) -> String {
+        let label = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
+        if label.isEmpty == false {
+            return label
+        }
+        if let value = element.value as? String {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty == false {
+                return trimmed
+            }
+        }
+        return ""
+    }
+
+    @MainActor
     func testLaunchShowsAlbumsAndEnablesChangeNow() throws {
         let app = makeApp()
         launchApp(app)
@@ -101,6 +144,7 @@ final class MuraloomUITests: XCTestCase {
         _ = requireElement(app, id: "albums.picker", timeout: 5)
         let changeNow = requireElement(app, id: "wallpaper.changeNow", timeout: 5)
         XCTAssertTrue(changeNow.isEnabled)
+        XCTAssertFalse(element(app, id: "wallpaper.retryOnline").exists)
     }
 
     @MainActor
@@ -175,5 +219,44 @@ final class MuraloomUITests: XCTestCase {
         menubarSignIn.click()
 
         _ = requireElement(app, id: "menubar.signOut", timeout: 5)
+    }
+
+    @MainActor
+    func testOfflineAfterWarmCacheShowsCachedFallbackSource() throws {
+        let app = makeApp(photosMode: "offlineAfterFirstSync")
+        launchApp(app)
+
+        let changeNow = requireElement(app, id: "wallpaper.changeNow", timeout: 5)
+        changeNow.click()
+        waitForLabelContains(app, id: "status.source", expectedText: "Live")
+
+        changeNow.click()
+        waitForLabelContains(app, id: "status.source", expectedText: "Cached fallback")
+    }
+
+    @MainActor
+    func testOfflineWithoutCacheShowsGuidance() throws {
+        let app = makeApp(photosMode: "offlineAlways")
+        launchApp(app)
+
+        let changeNow = requireElement(app, id: "wallpaper.changeNow", timeout: 5)
+        changeNow.click()
+
+        waitForLabelContains(app, id: "status.source", expectedText: "Offline (no cache)")
+        waitForLabelContains(app, id: "status.lastError", expectedText: "Offline and no cached photos are available")
+    }
+
+    @MainActor
+    func testRetryOnlineReturnsToLiveSourceAfterRecovery() throws {
+        let app = makeApp(photosMode: "offlineFailOnceThenRecover")
+        launchApp(app)
+
+        let changeNow = requireElement(app, id: "wallpaper.changeNow", timeout: 5)
+        changeNow.click()
+        waitForLabelContains(app, id: "status.source", expectedText: "Offline (no cache)")
+
+        let retry = requireElement(app, id: "wallpaper.retryOnline", timeout: 5)
+        retry.click()
+        waitForLabelContains(app, id: "status.source", expectedText: "Live")
     }
 }

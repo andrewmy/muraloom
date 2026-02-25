@@ -35,6 +35,9 @@ final class UITestPhotosService: PhotosServiceModel {
         case normal = "normal"
         case listAlbumsFailOnce = "listAlbumsFailOnce"
         case listAlbumsAlwaysFail = "listAlbumsAlwaysFail"
+        case offlineAlways = "offlineAlways"
+        case offlineAfterFirstSync = "offlineAfterFirstSync"
+        case offlineFailOnceThenRecover = "offlineFailOnceThenRecover"
     }
 
     struct Configuration {
@@ -54,6 +57,7 @@ final class UITestPhotosService: PhotosServiceModel {
 
     private let config: Configuration
     private var listAlbumsCallCount: Int = 0
+    private var searchPhotosCallCount: Int = 0
 
     init(config: Configuration = Configuration()) {
         self.config = config
@@ -102,7 +106,7 @@ final class UITestPhotosService: PhotosServiceModel {
     override func listAlbums() async throws -> [OneDriveAlbum] {
         listAlbumsCallCount += 1
         switch config.mode {
-        case .normal:
+        case .normal, .offlineAlways, .offlineAfterFirstSync, .offlineFailOnceThenRecover:
             return Self.albums
         case .listAlbumsFailOnce:
             if listAlbumsCallCount == 1 { throw UITestPhotosError.listAlbumsFailed }
@@ -117,7 +121,23 @@ final class UITestPhotosService: PhotosServiceModel {
     }
 
     override func searchPhotos(inAlbumId albumId: String) async throws -> [MediaItem] {
-        Self.items
+        searchPhotosCallCount += 1
+        switch config.mode {
+        case .normal, .listAlbumsFailOnce, .listAlbumsAlwaysFail:
+            return Self.items
+        case .offlineAlways:
+            throw URLError(.notConnectedToInternet)
+        case .offlineAfterFirstSync:
+            if searchPhotosCallCount == 1 {
+                return Self.items
+            }
+            throw URLError(.networkConnectionLost)
+        case .offlineFailOnceThenRecover:
+            if searchPhotosCallCount == 1 {
+                throw URLError(.notConnectedToInternet)
+            }
+            return Self.items
+        }
     }
 
     override func scanAlbum(inAlbumId albumId: String) async throws -> AlbumScanResult {

@@ -46,6 +46,26 @@ struct MenuBarMenuView: View {
         return id.isEmpty ? "—" : id
     }
 
+    private var sourceStatusText: String {
+        if wallpaperManager.isUsingCachedFallback {
+            return "Cached fallback"
+        }
+        if let cooldownUntil = wallpaperManager.offlineCooldownUntil, cooldownUntil > Date() {
+            return "Offline (no cache)"
+        }
+        return "Live"
+    }
+
+    private var shouldShowRetryOnlineNow: Bool {
+        if wallpaperManager.isUsingCachedFallback {
+            return true
+        }
+        guard let cooldownUntil = wallpaperManager.offlineCooldownUntil else {
+            return false
+        }
+        return cooldownUntil > Date()
+    }
+
     private func stageText(_ stage: WallpaperManager.WallpaperUpdateStage) -> String {
         switch stage {
         case .idle:
@@ -127,6 +147,14 @@ struct MenuBarMenuView: View {
             }
 
             Text("Activity: \(stageText(wallpaperManager.updateStage))")
+            Text("Source: \(sourceStatusText)")
+            Text("Cache: \(wallpaperManager.cacheReadyCount)/\(wallpaperManager.cacheTargetCount)")
+
+            if let lastSync = wallpaperManager.lastSyncAt {
+                Text("Last sync: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
+            } else {
+                Text("Last sync: —")
+            }
 
             if let last = wallpaperManager.lastSuccessfulUpdate {
                 Text("Last changed: \(last.formatted(date: .abbreviated, time: .shortened))")
@@ -145,20 +173,15 @@ struct MenuBarMenuView: View {
             } else if settings.changeFrequency == .never {
                 Text("Next change: Off")
             } else {
-                let interval = WallpaperManager.intervalSeconds(for: settings.changeFrequency)
-                let due = WallpaperManager.computeNextDueDate(
-                    now: Date(),
-                    lastSuccessfulWallpaperUpdate: settings.lastSuccessfulWallpaperUpdate,
-                    intervalSeconds: interval,
-                    hasSelectedAlbum: true,
-                    isPaused: false,
-                    lastAttemptDate: nil
-                )
-                if let due {
-                    Text("Next change: \(due.formatted(date: .abbreviated, time: .shortened))")
+                if let nextScheduled = wallpaperManager.nextScheduledUpdate {
+                    Text("Next change: \(nextScheduled.formatted(date: .abbreviated, time: .shortened))")
                 } else {
                     Text("Next change: —")
                 }
+            }
+
+            if let syncError = wallpaperManager.lastSyncError, !syncError.isEmpty {
+                Text("Last sync error: \(syncError)")
             }
 
             if let lastError = wallpaperManager.lastUpdateError, !lastError.isEmpty {
@@ -174,6 +197,16 @@ struct MenuBarMenuView: View {
             }
             .disabled(wallpaperManager.isUpdating || authService.isSignedIn == false || hasSelectedAlbum == false)
             .accessibilityIdentifier("menubar.changeNow")
+
+            if shouldShowRetryOnlineNow {
+                Button {
+                    wallpaperManager.retryOnlineNow()
+                } label: {
+                    Label("Retry Online Now", systemImage: "arrow.clockwise")
+                }
+                .disabled(wallpaperManager.isUpdating || authService.isSignedIn == false || hasSelectedAlbum == false)
+                .accessibilityIdentifier("menubar.retryOnline")
+            }
 
             if settings.isPaused {
                 Button {

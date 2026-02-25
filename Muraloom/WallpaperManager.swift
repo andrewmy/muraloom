@@ -2,6 +2,53 @@ import AppKit // For NSWorkspace
 import CryptoKit
 import Foundation
 
+protocol WallpaperApplying {
+    var screenCount: Int { get }
+    func currentWallpaperURL() -> URL?
+    func setWallpaper(
+        _ wallpaperFileURL: URL,
+        options: [NSWorkspace.DesktopImageOptionKey: Any]
+    ) throws
+}
+
+struct SystemWallpaperApplier: WallpaperApplying {
+    var screenCount: Int { NSScreen.screens.count }
+
+    func currentWallpaperURL() -> URL? {
+        guard let screen = NSScreen.screens.first else { return nil }
+        return NSWorkspace.shared.desktopImageURL(for: screen)
+    }
+
+    func setWallpaper(
+        _ wallpaperFileURL: URL,
+        options: [NSWorkspace.DesktopImageOptionKey: Any]
+    ) throws {
+        let screens = NSScreen.screens
+        guard screens.isEmpty == false else {
+            throw NSError(
+                domain: "WallpaperManager",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "No screens available."]
+            )
+        }
+
+        var firstError: Error?
+        for screen in screens {
+            do {
+                try NSWorkspace.shared.setDesktopImageURL(wallpaperFileURL, for: screen, options: options)
+            } catch {
+                if firstError == nil {
+                    firstError = error
+                }
+            }
+        }
+
+        if let firstError {
+            throw firstError
+        }
+    }
+}
+
 @MainActor
 final class WallpaperManager: ObservableObject {
     enum WallpaperUpdateTrigger {
@@ -27,20 +74,67 @@ final class WallpaperManager: ObservableObject {
     @Published private(set) var lastUpdateError: String?
     @Published private(set) var isUpdating: Bool = false
     @Published private(set) var updateStage: WallpaperUpdateStage = .idle
+    @Published private(set) var isUsingCachedFallback: Bool = false
+    @Published private(set) var cacheReadyCount: Int = 0
+    @Published private(set) var cacheTargetCount: Int = 20
+    @Published private(set) var lastSyncAt: Date?
+    @Published private(set) var lastSyncError: String?
+    @Published private(set) var offlineCooldownUntil: Date?
 
     private let photosService: any PhotosService
     private let settings: SettingsModel
+    private let wallpaperApplier: any WallpaperApplying
+    private let applicationSupportDirectoryProvider: () throws -> URL
+    private let nowProvider: () -> Date
     private var wallpaperTimer: Timer?
 
     private var inFlightUpdateTask: Task<Void, Never>?
     private var inFlightUpdateId: UUID?
     private var inFlightUpdateTrigger: WallpaperUpdateTrigger?
+    private var inFlightBypassesOfflineCooldown: Bool = false
     private var lastAttemptDate: Date?
+    private var cachePrefetchTask: Task<Void, Never>?
+    private var cacheIndexByItemId: [String: CacheIndexEntry] = [:]
+    private var consecutiveUnauthorizedTokenErrors: Int = 0
 
-    init(photosService: any PhotosService, settings: SettingsModel) {
+    private let offlineCooldownDuration: TimeInterval = 300
+    private let maxCachePrefetchPerSync: Int = 4
+
+    private struct CacheIndexEntry: Codable {
+        let itemId: String
+        let cTag: String?
+        let fileURL: String
+        let lastUsedAt: Date?
+    }
+
+    private struct CacheIndexPayload: Codable {
+        var entries: [CacheIndexEntry]
+    }
+
+    init(
+        photosService: any PhotosService,
+        settings: SettingsModel,
+        wallpaperApplier: any WallpaperApplying = SystemWallpaperApplier(),
+        applicationSupportDirectoryProvider: @escaping () throws -> URL = {
+            try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+        },
+        nowProvider: @escaping () -> Date = Date.init
+    ) {
         self.photosService = photosService
         self.settings = settings
+        self.wallpaperApplier = wallpaperApplier
+        self.applicationSupportDirectoryProvider = applicationSupportDirectoryProvider
+        self.nowProvider = nowProvider
         self.lastSuccessfulUpdate = settings.lastSuccessfulWallpaperUpdate
+        if let dir = try? ensureWallpaperDirectoryURL() {
+            cacheIndexByItemId = loadCacheIndex(from: dir)
+            recalculateCacheReadyCount()
+        }
     }
 
     struct WallpaperCandidate {
@@ -101,7 +195,8 @@ final class WallpaperManager: ObservableObject {
         isPaused: Bool,
         lastAttemptDate: Date?,
         minimumLeadTime: TimeInterval = 60,
-        minimumRetryDelay: TimeInterval = 300
+        minimumRetryDelay: TimeInterval = 300,
+        offlineCooldownUntil: Date? = nil
     ) -> Date? {
         guard isPaused == false else { return nil }
         guard hasSelectedAlbum else { return nil }
@@ -123,6 +218,10 @@ final class WallpaperManager: ObservableObject {
             }
         }
 
+        if let offlineCooldownUntil, offlineCooldownUntil > now, due < offlineCooldownUntil {
+            due = offlineCooldownUntil
+        }
+
         return due
     }
 
@@ -136,12 +235,22 @@ final class WallpaperManager: ObservableObject {
         nextScheduledUpdate = nil
     }
 
-    func requestWallpaperUpdate(trigger: WallpaperUpdateTrigger) {
+    func retryOnlineNow() {
+        requestWallpaperUpdate(trigger: .manual, bypassOfflineCooldown: true)
+    }
+
+    func requestWallpaperUpdate(
+        trigger: WallpaperUpdateTrigger,
+        bypassOfflineCooldown: Bool = false
+    ) {
         if trigger == .manual {
             wallpaperTimer?.invalidate()
             wallpaperTimer = nil
             nextScheduledUpdate = nil
         }
+
+        cachePrefetchTask?.cancel()
+        cachePrefetchTask = nil
 
         if let inFlightUpdateTask, let inFlightUpdateTrigger {
             switch (inFlightUpdateTrigger, trigger) {
@@ -157,6 +266,7 @@ final class WallpaperManager: ObservableObject {
         let updateId = UUID()
         inFlightUpdateId = updateId
         inFlightUpdateTrigger = trigger
+        inFlightBypassesOfflineCooldown = bypassOfflineCooldown
         isUpdating = true
         updateStage = .fetchingAlbumItems
 
@@ -167,13 +277,17 @@ final class WallpaperManager: ObservableObject {
                     self.inFlightUpdateTask = nil
                     self.inFlightUpdateId = nil
                     self.inFlightUpdateTrigger = nil
+                    self.inFlightBypassesOfflineCooldown = false
                     self.isUpdating = false
                     if self.updateStage != .idle {
                         self.updateStage = .idle
                     }
                 }
             }
-            await self.updateWallpaper(trigger: trigger)
+            await self.updateWallpaper(
+                trigger: trigger,
+                bypassOfflineCooldown: bypassOfflineCooldown
+            )
         }
     }
 
@@ -194,7 +308,7 @@ final class WallpaperManager: ObservableObject {
         wallpaperTimer?.invalidate()
         wallpaperTimer = nil
 
-        let now = Date()
+        let now = nowProvider()
         let interval = Self.intervalSeconds(for: settings.changeFrequency)
         let hasSelectedAlbum = (settings.selectedAlbumId?.isEmpty == false)
         guard let due = Self.computeNextDueDate(
@@ -203,12 +317,14 @@ final class WallpaperManager: ObservableObject {
             intervalSeconds: interval,
             hasSelectedAlbum: hasSelectedAlbum,
             isPaused: settings.isPaused,
-            lastAttemptDate: lastAttemptDate
+            lastAttemptDate: lastAttemptDate,
+            offlineCooldownUntil: offlineCooldownUntil
         ) else {
             nextScheduledUpdate = nil
             return
         }
 
+        nextScheduledUpdate = due
         let timeInterval = max(1, due.timeIntervalSinceNow)
         wallpaperTimer = Timer(timeInterval: timeInterval, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -224,7 +340,23 @@ final class WallpaperManager: ObservableObject {
         }
     }
 
-    private func updateWallpaper(trigger: WallpaperUpdateTrigger) async {
+    private enum FailureClass {
+        case offline
+        case authRequired
+        case other
+    }
+
+    private struct ApplyCandidatesResult {
+        let didSetWallpaper: Bool
+        let updatedSequentialIndex: Int?
+        let errors: [String]
+        let maxAttempts: Int
+    }
+
+    private func updateWallpaper(
+        trigger: WallpaperUpdateTrigger,
+        bypassOfflineCooldown: Bool
+    ) async {
         var shouldScheduleAfter = true
         defer {
             if shouldScheduleAfter {
@@ -238,12 +370,51 @@ final class WallpaperManager: ObservableObject {
             return
         }
 
+        let now = nowProvider()
+        lastAttemptDate = now
+
         do {
-            lastAttemptDate = Date()
+            let wallpaperDirURL = try ensureWallpaperDirectoryURL()
+            cacheIndexByItemId = loadCacheIndex(from: wallpaperDirURL)
+            recalculateCacheReadyCount()
+
+            let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
+            let currentWallpaperURL = currentManagedWallpaperURL(in: wallpaperDirURL)
+
+            let inCooldown = (offlineCooldownUntil?.timeIntervalSince(nowProvider()) ?? 0) > 0
+            if inCooldown && bypassOfflineCooldown == false {
+                let cachedItems = cachedFallbackItems()
+                let fallback = try await applyCandidates(
+                    cachedItems,
+                    allowNetworkDownload: false,
+                    wallpaperDirURL: wallpaperDirURL,
+                    currentWallpaperURL: currentWallpaperURL
+                )
+
+                guard Task.isCancelled == false else { return }
+                if fallback.didSetWallpaper {
+                    finalizeSuccessfulWallpaperChange(
+                        updatedSequentialIndex: fallback.updatedSequentialIndex,
+                        usedCachedFallback: true
+                    )
+                    return
+                }
+
+                isUsingCachedFallback = false
+                lastUpdateError = "Offline and no cached photos are available. Connect to the internet, then use Retry online now."
+                updateStage = .idle
+                return
+            }
 
             updateStage = .fetchingAlbumItems
             let mediaItems = try await photosService.searchPhotos(inAlbumId: albumId)
             if Task.isCancelled { return }
+
+            consecutiveUnauthorizedTokenErrors = 0
+            offlineCooldownUntil = nil
+            isUsingCachedFallback = false
+            lastSyncAt = nowProvider()
+            lastSyncError = nil
 
             updateStage = .filtering
             settings.albumRawPictureCount = mediaItems.count
@@ -255,169 +426,400 @@ final class WallpaperManager: ObservableObject {
             let filteredItems = filtered.eligibleItems
             settings.albumPictureCount = filteredItems.count
             settings.showNoPicturesWarning = filteredItems.isEmpty
+
+            syncCacheIndex(with: filteredItems, in: wallpaperDirURL)
             if filteredItems.isEmpty {
-                print("No photos found after applying filters.")
+                lastUpdateError = "No usable photos found after applying filters."
+                updateStage = .idle
                 return
             }
 
-            let wallpaperDirURL = try ensureWallpaperDirectoryURL()
-            let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
-
-            let currentWallpaperURL: URL? = {
-                guard let screen = NSScreen.screens.first else { return nil }
-                guard let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
-                let standardized = url.standardizedFileURL
-                let filename = standardized.lastPathComponent
-                guard filename.hasPrefix("wallpaper-"), filename.hasSuffix(".jpg") else { return nil }
-                guard standardized.deletingLastPathComponent().standardizedFileURL == wallpaperDirURL.standardizedFileURL else { return nil }
-                return standardized
-            }()
-
-            let maxAttempts = min(currentWallpaperURL == nil ? 3 : 5, filteredItems.count)
-            let candidates = Self.buildWallpaperCandidates(
-                filteredItems: filteredItems,
-                maxAttempts: maxAttempts,
-                pickRandomly: settings.pickRandomly,
-                lastPickedIndex: settings.lastPickedIndex,
-                avoidItemId: settings.lastSetWallpaperItemId
+            let liveResult = try await applyCandidates(
+                filteredItems,
+                allowNetworkDownload: true,
+                wallpaperDirURL: wallpaperDirURL,
+                currentWallpaperURL: currentWallpaperURL
             )
 
-            var conversionErrors: [String] = []
-            var updatedSequentialIndex: Int?
-            var didSetWallpaper = false
-
-            for (i, candidate) in candidates.enumerated() {
-                if Task.isCancelled { return }
-                do {
-                    if let lastId = settings.lastSetWallpaperItemId, filteredItems.count > 1, candidate.item.id == lastId {
-                        continue
-                    }
-
-                    let displayName = candidate.item.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let candidateName = (displayName?.isEmpty == false) ? displayName! : candidate.item.id
-                    updateStage = .selectingCandidate(attempt: i + 1, total: candidates.count, name: candidateName)
-
-                    let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
-                    if let currentWallpaperURL, filteredItems.count > 1,
-                       wallpaperFileURL.standardizedFileURL == currentWallpaperURL {
-                        continue
-                    }
-                    if isUsableCachedWallpaperFile(at: wallpaperFileURL) {
-                        updateStage = .usingCachedWallpaper(name: candidateName)
-                        var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
-
-                        switch settings.wallpaperFillMode {
-                        case .fill:
-                            options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
-                            options[.allowClipping] = true
-                        case .fit:
-                            options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
-                            options[.allowClipping] = false
-                        case .stretch:
-                            options[.imageScaling] = NSImageScaling.scaleAxesIndependently.rawValue
-                            options[.allowClipping] = false
-                        case .center:
-                            options[.imageScaling] = NSImageScaling.scaleNone.rawValue
-                            options[.allowClipping] = false
-                        }
-
-                        try setWallpaperOnAllScreens(wallpaperFileURL, options: options)
-
-                        updatedSequentialIndex = candidate.filteredIndex
-                        persistLastSetWallpaperItem(candidate.item)
-                        conversionErrors.removeAll()
-                        didSetWallpaper = true
-                        cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
-                        break
-                    }
-
-                    updateStage = .downloading(name: candidateName, attempt: i + 1, total: candidates.count)
-                    let rawData = try await photosService.downloadImageData(for: candidate.item)
-                    if Task.isCancelled { return }
-
-                    updateStage = .decoding(name: candidateName)
-                    let jpegData = try await WallpaperImageTranscoder.prepareWallpaperJPEGAsync(
-                        from: rawData,
-                        maxDimension: maxDimension,
-                        filenameHint: candidate.item.name
-                    )
-
-                    if Task.isCancelled { return }
-                    updateStage = .writingFile(name: candidateName)
-                    try jpegData.write(to: wallpaperFileURL, options: [.atomic])
-
-                    var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
-
-                    switch settings.wallpaperFillMode {
-                    case .fill:
-                        options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
-                        options[.allowClipping] = true
-                    case .fit:
-                        options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
-                        options[.allowClipping] = false
-                    case .stretch:
-                        options[.imageScaling] = NSImageScaling.scaleAxesIndependently.rawValue
-                        options[.allowClipping] = false
-                    case .center:
-                        options[.imageScaling] = NSImageScaling.scaleNone.rawValue
-                        options[.allowClipping] = false
-                    }
-
-                    updateStage = .applyingToScreens(screenCount: NSScreen.screens.count)
-                    try setWallpaperOnAllScreens(wallpaperFileURL, options: options)
-
-                    updatedSequentialIndex = candidate.filteredIndex
-                    persistLastSetWallpaperItem(candidate.item)
-                    conversionErrors.removeAll()
-                    didSetWallpaper = true
-                    cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
-                    break
-                } catch is CancellationError {
-                    throw CancellationError()
-                } catch {
-                    let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
-                    try? FileManager.default.removeItem(at: wallpaperFileURL)
-                    conversionErrors.append("#\(i + 1): \(error.localizedDescription)")
-                }
-            }
-
             guard Task.isCancelled == false else { return }
-            guard didSetWallpaper else {
+            guard liveResult.didSetWallpaper else {
                 updateStage = .idle
-                if conversionErrors.isEmpty {
+                if liveResult.errors.isEmpty {
                     if filteredItems.count <= 1 {
                         lastUpdateError = "Only one usable photo is available, so the wallpaper can repeat."
                     } else {
                         lastUpdateError = "Couldn’t pick a different photo to avoid repeating the last wallpaper."
                     }
                 } else {
-                    lastUpdateError = "Couldn’t decode/convert any of the last \(maxAttempts) photos. " + conversionErrors.joined(separator: " ")
+                    lastUpdateError = "Couldn’t decode/convert any of the last \(liveResult.maxAttempts) photos. " + liveResult.errors.joined(separator: " ")
                 }
                 return
             }
 
-            if let updatedSequentialIndex {
-                settings.lastPickedIndex = updatedSequentialIndex
-            }
-
-            print("Wallpaper updated successfully!")
-            let now = Date()
-            settings.lastSuccessfulWallpaperUpdate = now
-            lastSuccessfulUpdate = now
-            lastUpdateError = nil
-            settings.flushToDisk()
-            let finalName = settings.lastSetWallpaperItemName?.trimmingCharacters(in: .whitespacesAndNewlines)
-            updateStage = .done(name: (finalName?.isEmpty == false) ? finalName! : (settings.lastSetWallpaperItemId ?? ""))
+            finalizeSuccessfulWallpaperChange(
+                updatedSequentialIndex: liveResult.updatedSequentialIndex,
+                usedCachedFallback: false
+            )
+            scheduleCachePrefetch(
+                items: filteredItems,
+                in: wallpaperDirURL,
+                maxDimension: maxDimension
+            )
 
         } catch is CancellationError {
             // Manual updates can cancel timer-driven updates; treat cancellation as expected.
             shouldScheduleAfter = false
             updateStage = .idle
         } catch {
-            print("Error updating wallpaper: \(error.localizedDescription)")
-            lastUpdateError = error.localizedDescription
-            updateStage = .idle
+            let failureClass = classifyFailure(error)
+            switch failureClass {
+            case .offline:
+                lastSyncError = error.localizedDescription
+                offlineCooldownUntil = nowProvider().addingTimeInterval(offlineCooldownDuration)
+
+                do {
+                    let wallpaperDirURL = try ensureWallpaperDirectoryURL()
+                    cacheIndexByItemId = loadCacheIndex(from: wallpaperDirURL)
+                    recalculateCacheReadyCount()
+                    let fallback = try await applyCandidates(
+                        cachedFallbackItems(),
+                        allowNetworkDownload: false,
+                        wallpaperDirURL: wallpaperDirURL,
+                        currentWallpaperURL: currentManagedWallpaperURL(in: wallpaperDirURL)
+                    )
+
+                    guard Task.isCancelled == false else { return }
+                    if fallback.didSetWallpaper {
+                        finalizeSuccessfulWallpaperChange(
+                            updatedSequentialIndex: fallback.updatedSequentialIndex,
+                            usedCachedFallback: true
+                        )
+                        return
+                    }
+                } catch is CancellationError {
+                    shouldScheduleAfter = false
+                    updateStage = .idle
+                    return
+                } catch {
+                    lastSyncError = error.localizedDescription
+                }
+
+                isUsingCachedFallback = false
+                lastUpdateError = "Offline and no cached photos are available. Connect to the internet, then use Retry online now."
+                updateStage = .idle
+
+            case .authRequired:
+                lastSyncError = error.localizedDescription
+                isUsingCachedFallback = false
+                lastUpdateError = "Sign-in is required. Please sign out and sign in again."
+                updateStage = .idle
+
+            case .other:
+                lastSyncError = error.localizedDescription
+                lastUpdateError = error.localizedDescription
+                updateStage = .idle
+            }
         }
+    }
+
+    private func classifyFailure(_ error: Error) -> FailureClass {
+        if Self.isOfflineClassError(error) {
+            consecutiveUnauthorizedTokenErrors = 0
+            return .offline
+        }
+
+        if Self.isExplicitAuthInvalidError(error) {
+            consecutiveUnauthorizedTokenErrors = 0
+            return .authRequired
+        }
+
+        if Self.isUnauthorizedTokenError(error) {
+            consecutiveUnauthorizedTokenErrors += 1
+            if consecutiveUnauthorizedTokenErrors >= 2 {
+                return .authRequired
+            }
+            return .other
+        }
+
+        consecutiveUnauthorizedTokenErrors = 0
+        return .other
+    }
+
+    nonisolated static func isOfflineClassError(_ error: Error) -> Bool {
+        let offlineCodes: Set<URLError.Code> = [
+            .notConnectedToInternet,
+            .networkConnectionLost,
+            .timedOut,
+            .cannotFindHost,
+            .cannotConnectToHost,
+            .dnsLookupFailed,
+        ]
+
+        func containsOfflineCode(_ error: Error) -> Bool {
+            if let urlError = error as? URLError {
+                return offlineCodes.contains(urlError.code)
+            }
+
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain {
+                let code = URLError.Code(rawValue: nsError.code)
+                if offlineCodes.contains(code) {
+                    return true
+                }
+            }
+
+            if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+                return containsOfflineCode(underlying)
+            }
+
+            return false
+        }
+
+        return containsOfflineCode(error)
+    }
+
+    nonisolated static func isExplicitAuthInvalidError(_ error: Error) -> Bool {
+        switch error {
+        case OneDriveAuthError.notSignedIn:
+            return true
+
+        case OneDriveAuthError.providerError(let details):
+            let normalized = details.lowercased()
+            return normalized.contains("invalid_grant")
+                || normalized.contains("sign in again")
+                || normalized.contains("session expired")
+
+        case OneDriveAuthError.httpError(_, let body):
+            return body.lowercased().contains("invalid_grant")
+
+        default:
+            return false
+        }
+    }
+
+    nonisolated static func isUnauthorizedTokenError(_ error: Error) -> Bool {
+        func bodyLooksLikeInvalidToken(_ body: String) -> Bool {
+            let normalized = body.lowercased()
+            return normalized.contains("invalidauthenticationtoken")
+                || normalized.contains("invalid_token")
+                || normalized.contains("token expired")
+                || normalized.contains("token is expired")
+        }
+
+        switch error {
+        case OneDriveGraphError.httpError(let status, let body):
+            return status == 401 && bodyLooksLikeInvalidToken(body)
+        case OneDriveAuthError.httpError(let status, let body):
+            return status == 401 && bodyLooksLikeInvalidToken(body)
+        default:
+            return false
+        }
+    }
+
+    private func finalizeSuccessfulWallpaperChange(
+        updatedSequentialIndex: Int?,
+        usedCachedFallback: Bool
+    ) {
+        if let updatedSequentialIndex {
+            settings.lastPickedIndex = updatedSequentialIndex
+        }
+
+        let now = nowProvider()
+        settings.lastSuccessfulWallpaperUpdate = now
+        lastSuccessfulUpdate = now
+        lastUpdateError = nil
+        isUsingCachedFallback = usedCachedFallback
+        settings.flushToDisk()
+
+        let finalName = settings.lastSetWallpaperItemName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        updateStage = .done(name: (finalName?.isEmpty == false) ? finalName! : (settings.lastSetWallpaperItemId ?? ""))
+    }
+
+    private func applyCandidates(
+        _ items: [MediaItem],
+        allowNetworkDownload: Bool,
+        wallpaperDirURL: URL,
+        currentWallpaperURL: URL?
+    ) async throws -> ApplyCandidatesResult {
+        guard items.isEmpty == false else {
+            return ApplyCandidatesResult(didSetWallpaper: false, updatedSequentialIndex: nil, errors: [], maxAttempts: 0)
+        }
+
+        let maxAttempts = min(currentWallpaperURL == nil ? 3 : 5, items.count)
+        let candidates = Self.buildWallpaperCandidates(
+            filteredItems: items,
+            maxAttempts: maxAttempts,
+            pickRandomly: settings.pickRandomly,
+            lastPickedIndex: settings.lastPickedIndex,
+            avoidItemId: settings.lastSetWallpaperItemId
+        )
+
+        let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
+        var conversionErrors: [String] = []
+        var updatedSequentialIndex: Int?
+
+        for (i, candidate) in candidates.enumerated() {
+            if Task.isCancelled { return ApplyCandidatesResult(didSetWallpaper: false, updatedSequentialIndex: nil, errors: [], maxAttempts: maxAttempts) }
+            do {
+                if let lastId = settings.lastSetWallpaperItemId, items.count > 1, candidate.item.id == lastId {
+                    continue
+                }
+
+                let candidateName = candidateDisplayName(candidate.item)
+                updateStage = .selectingCandidate(attempt: i + 1, total: candidates.count, name: candidateName)
+
+                let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
+                if let currentWallpaperURL, items.count > 1,
+                   wallpaperFileURL.standardizedFileURL == currentWallpaperURL {
+                    continue
+                }
+
+                if isUsableCachedWallpaperFile(at: wallpaperFileURL) {
+                    updateStage = .usingCachedWallpaper(name: candidateName)
+                    try setWallpaperOnAllScreens(wallpaperFileURL, options: wallpaperOptions())
+                    updatedSequentialIndex = candidate.filteredIndex
+                    markItemAsUsed(candidate.item, wallpaperFileURL: wallpaperFileURL)
+                    cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
+                    return ApplyCandidatesResult(
+                        didSetWallpaper: true,
+                        updatedSequentialIndex: updatedSequentialIndex,
+                        errors: [],
+                        maxAttempts: maxAttempts
+                    )
+                }
+
+                guard allowNetworkDownload else { continue }
+
+                updateStage = .downloading(name: candidateName, attempt: i + 1, total: candidates.count)
+                let rawData = try await photosService.downloadImageData(for: candidate.item)
+                if Task.isCancelled { return ApplyCandidatesResult(didSetWallpaper: false, updatedSequentialIndex: nil, errors: [], maxAttempts: maxAttempts) }
+
+                updateStage = .decoding(name: candidateName)
+                let jpegData = try await WallpaperImageTranscoder.prepareWallpaperJPEGAsync(
+                    from: rawData,
+                    maxDimension: maxDimension,
+                    filenameHint: candidate.item.name
+                )
+
+                if Task.isCancelled { return ApplyCandidatesResult(didSetWallpaper: false, updatedSequentialIndex: nil, errors: [], maxAttempts: maxAttempts) }
+                updateStage = .writingFile(name: candidateName)
+                try jpegData.write(to: wallpaperFileURL, options: [.atomic])
+                try setWallpaperOnAllScreens(wallpaperFileURL, options: wallpaperOptions())
+
+                updatedSequentialIndex = candidate.filteredIndex
+                markItemAsUsed(candidate.item, wallpaperFileURL: wallpaperFileURL)
+                cleanupOldWallpaperFiles(in: wallpaperDirURL, keep: 50)
+                return ApplyCandidatesResult(
+                    didSetWallpaper: true,
+                    updatedSequentialIndex: updatedSequentialIndex,
+                    errors: [],
+                    maxAttempts: maxAttempts
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let wallpaperFileURL = wallpaperCacheFileURL(for: candidate.item, in: wallpaperDirURL)
+                if allowNetworkDownload {
+                    try? FileManager.default.removeItem(at: wallpaperFileURL)
+                }
+                conversionErrors.append("#\(i + 1): \(error.localizedDescription)")
+            }
+        }
+
+        return ApplyCandidatesResult(
+            didSetWallpaper: false,
+            updatedSequentialIndex: nil,
+            errors: conversionErrors,
+            maxAttempts: maxAttempts
+        )
+    }
+
+    private func scheduleCachePrefetch(items: [MediaItem], in wallpaperDirURL: URL, maxDimension: Int) {
+        cachePrefetchTask?.cancel()
+        cachePrefetchTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.prefetchMissingCacheItems(
+                from: items,
+                in: wallpaperDirURL,
+                maxDimension: maxDimension
+            )
+        }
+    }
+
+    private func prefetchMissingCacheItems(
+        from items: [MediaItem],
+        in wallpaperDirURL: URL,
+        maxDimension: Int
+    ) async {
+        let desiredItems = Array(items.prefix(cacheTargetCount))
+        guard desiredItems.isEmpty == false else {
+            recalculateCacheReadyCount()
+            return
+        }
+
+        let currentlyReady = desiredItems.filter { isUsableCachedWallpaperFile(at: wallpaperCacheFileURL(for: $0, in: wallpaperDirURL)) }.count
+        let remaining = max(0, cacheTargetCount - currentlyReady)
+        let prefetchBudget = min(maxCachePrefetchPerSync, remaining)
+        guard prefetchBudget > 0 else {
+            recalculateCacheReadyCount()
+            return
+        }
+
+        var prefetched = 0
+        var prefetchErrors: [String] = []
+
+        for item in desiredItems {
+            if Task.isCancelled { return }
+            if prefetched >= prefetchBudget { break }
+
+            let fileURL = wallpaperCacheFileURL(for: item, in: wallpaperDirURL)
+            if isUsableCachedWallpaperFile(at: fileURL) { continue }
+
+            do {
+                let rawData = try await photosService.downloadImageData(for: item)
+                if Task.isCancelled { return }
+                let jpegData = try await WallpaperImageTranscoder.prepareWallpaperJPEGAsync(
+                    from: rawData,
+                    maxDimension: maxDimension,
+                    filenameHint: item.name
+                )
+                try jpegData.write(to: fileURL, options: [.atomic])
+                upsertCacheEntry(for: item, fileURL: fileURL, lastUsedAt: cacheIndexByItemId[item.id]?.lastUsedAt)
+                prefetched += 1
+            } catch {
+                try? FileManager.default.removeItem(at: fileURL)
+                prefetchErrors.append(error.localizedDescription)
+            }
+        }
+
+        recalculateCacheReadyCount()
+        if prefetchErrors.isEmpty == false {
+            lastSyncError = "Cache prefetch incomplete: \(prefetchErrors.joined(separator: " | "))"
+        }
+    }
+
+    private func candidateDisplayName(_ item: MediaItem) -> String {
+        let displayName = item.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (displayName?.isEmpty == false) ? displayName! : item.id
+    }
+
+    private func wallpaperOptions() -> [NSWorkspace.DesktopImageOptionKey: Any] {
+        var options: [NSWorkspace.DesktopImageOptionKey: Any] = [:]
+        switch settings.wallpaperFillMode {
+        case .fill:
+            options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
+            options[.allowClipping] = true
+        case .fit:
+            options[.imageScaling] = NSImageScaling.scaleProportionallyUpOrDown.rawValue
+            options[.allowClipping] = false
+        case .stretch:
+            options[.imageScaling] = NSImageScaling.scaleAxesIndependently.rawValue
+            options[.allowClipping] = false
+        case .center:
+            options[.imageScaling] = NSImageScaling.scaleNone.rawValue
+            options[.allowClipping] = false
+        }
+        return options
     }
 
     nonisolated static func eligibleMediaItems(
@@ -484,13 +886,13 @@ final class WallpaperManager: ObservableObject {
         settings.flushToDisk()
     }
 
+    private func markItemAsUsed(_ item: MediaItem, wallpaperFileURL: URL) {
+        persistLastSetWallpaperItem(item)
+        upsertCacheEntry(for: item, fileURL: wallpaperFileURL, lastUsedAt: nowProvider())
+    }
+
     private func ensureWallpaperDirectoryURL() throws -> URL {
-        let baseDir = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
+        let baseDir = try applicationSupportDirectoryProvider()
         let appDir = baseDir.appendingPathComponent("Muraloom", isDirectory: true)
         try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true, attributes: nil)
         return appDir
@@ -514,10 +916,17 @@ final class WallpaperManager: ObservableObject {
 
             // Legacy filename, for older builds.
             try? fm.removeItem(at: dir.appendingPathComponent("wallpaper.jpg"))
+            try? fm.removeItem(at: cacheIndexFileURL(in: dir))
 
             settings.lastSetWallpaperItemId = nil
             settings.lastSetWallpaperItemName = nil
             lastUpdateError = nil
+            lastSyncError = nil
+            lastSyncAt = nil
+            offlineCooldownUntil = nil
+            isUsingCachedFallback = false
+            cacheIndexByItemId = [:]
+            cacheReadyCount = 0
             updateStage = .idle
         } catch {
             lastUpdateError = error.localizedDescription
@@ -529,25 +938,8 @@ final class WallpaperManager: ObservableObject {
         _ wallpaperFileURL: URL,
         options: [NSWorkspace.DesktopImageOptionKey: Any]
     ) throws {
-        let screens = NSScreen.screens
-        guard screens.isEmpty == false else {
-            throw NSError(domain: "WallpaperManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No screens available."])
-        }
-
-        var firstError: Error?
-        for screen in screens {
-            do {
-                try NSWorkspace.shared.setDesktopImageURL(wallpaperFileURL, for: screen, options: options)
-            } catch {
-                if firstError == nil {
-                    firstError = error
-                }
-            }
-        }
-
-        if let firstError {
-            throw firstError
-        }
+        updateStage = .applyingToScreens(screenCount: wallpaperApplier.screenCount)
+        try wallpaperApplier.setWallpaper(wallpaperFileURL, options: options)
     }
 
     private func cleanupOldWallpaperFiles(in dir: URL, keep: Int) {
@@ -573,6 +965,7 @@ final class WallpaperManager: ObservableObject {
         for old in sorted.dropFirst(keep) {
             try? fm.removeItem(at: old.url)
         }
+        recalculateCacheReadyCount()
     }
 
     private func wallpaperCacheFileURL(for item: MediaItem, in dir: URL) -> URL {
@@ -595,5 +988,113 @@ final class WallpaperManager: ObservableObject {
             return true
         }
         return false
+    }
+
+    private func currentManagedWallpaperURL(in wallpaperDirURL: URL) -> URL? {
+        guard let url = wallpaperApplier.currentWallpaperURL() else { return nil }
+        let standardized = url.standardizedFileURL
+        let filename = standardized.lastPathComponent
+        guard filename.hasPrefix("wallpaper-"), filename.hasSuffix(".jpg") else { return nil }
+        guard standardized.deletingLastPathComponent().standardizedFileURL == wallpaperDirURL.standardizedFileURL else { return nil }
+        return standardized
+    }
+
+    private func cachedFallbackItems() -> [MediaItem] {
+        let readyEntries = cacheIndexByItemId.values
+            .filter { isUsableCachedWallpaperFile(at: URL(fileURLWithPath: $0.fileURL)) }
+            .sorted { lhs, rhs in
+                (lhs.lastUsedAt ?? .distantPast) < (rhs.lastUsedAt ?? .distantPast)
+            }
+
+        recalculateCacheReadyCount()
+        return readyEntries.map { entry in
+            MediaItem(
+                id: entry.itemId,
+                downloadUrl: nil,
+                webUrl: nil,
+                pixelWidth: nil,
+                pixelHeight: nil,
+                name: nil,
+                mimeType: "image/jpeg",
+                cTag: entry.cTag
+            )
+        }
+    }
+
+    private func syncCacheIndex(with items: [MediaItem], in dir: URL) {
+        let previous = cacheIndexByItemId
+        var synced: [String: CacheIndexEntry] = [:]
+
+        for item in items {
+            let fileURL = wallpaperCacheFileURL(for: item, in: dir).standardizedFileURL
+            let previousLastUsed = previous[item.id]?.lastUsedAt
+            synced[item.id] = CacheIndexEntry(
+                itemId: item.id,
+                cTag: item.cTag,
+                fileURL: fileURL.path,
+                lastUsedAt: previousLastUsed
+            )
+        }
+
+        cacheIndexByItemId = synced
+        saveCacheIndex(cacheIndexByItemId, in: dir)
+        recalculateCacheReadyCount()
+    }
+
+    private func upsertCacheEntry(
+        for item: MediaItem,
+        fileURL: URL,
+        lastUsedAt: Date?
+    ) {
+        cacheIndexByItemId[item.id] = CacheIndexEntry(
+            itemId: item.id,
+            cTag: item.cTag,
+            fileURL: fileURL.standardizedFileURL.path,
+            lastUsedAt: lastUsedAt
+        )
+
+        if let dir = try? ensureWallpaperDirectoryURL() {
+            saveCacheIndex(cacheIndexByItemId, in: dir)
+        }
+        recalculateCacheReadyCount()
+    }
+
+    private func recalculateCacheReadyCount() {
+        cacheReadyCount = cacheIndexByItemId.values.reduce(into: 0) { partialResult, entry in
+            if isUsableCachedWallpaperFile(at: URL(fileURLWithPath: entry.fileURL)) {
+                partialResult += 1
+            }
+        }
+    }
+
+    private func cacheIndexFileURL(in dir: URL) -> URL {
+        dir.appendingPathComponent("wallpaper-cache-index.json")
+    }
+
+    private func loadCacheIndex(from dir: URL) -> [String: CacheIndexEntry] {
+        let url = cacheIndexFileURL(in: dir)
+        guard let data = try? Data(contentsOf: url) else { return [:] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        guard let payload = try? decoder.decode(CacheIndexPayload.self, from: data) else {
+            return [:]
+        }
+
+        var map: [String: CacheIndexEntry] = [:]
+        for entry in payload.entries {
+            map[entry.itemId] = entry
+        }
+        return map
+    }
+
+    private func saveCacheIndex(_ entriesById: [String: CacheIndexEntry], in dir: URL) {
+        let payload = CacheIndexPayload(entries: entriesById.values.sorted { $0.itemId < $1.itemId })
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        guard let data = try? encoder.encode(payload) else { return }
+        try? data.write(to: cacheIndexFileURL(in: dir), options: [.atomic])
     }
 }

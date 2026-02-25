@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -16,6 +17,8 @@ struct MuraloomApp: App {
         let settings: SettingsModel
         let authService: AuthService
         let photosService: PhotosServiceModel
+        let wallpaperApplier: any WallpaperApplying
+        let appSupportProvider: (() throws -> URL)?
 
         if isUITesting {
             let defaults = UserDefaults(suiteName: AppEnvironment.uiTestUserDefaultsSuiteName)
@@ -30,12 +33,21 @@ struct MuraloomApp: App {
 
             let mode = AppEnvironment.uiTestPhotosMode
             photosService = UITestPhotosService(config: .init(mode: mode))
+            wallpaperApplier = UITestWallpaperApplier()
+            let base = AppEnvironment.uiTestCacheBaseDirectory
+            try? FileManager.default.removeItem(at: base)
+            try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+            appSupportProvider = {
+                return base
+            }
         } else {
             settings = SettingsModel()
 
             let liveAuth = OneDriveAuthService()
             authService = liveAuth
             photosService = OneDrivePhotosService(authService: liveAuth)
+            wallpaperApplier = SystemWallpaperApplier()
+            appSupportProvider = nil
         }
 
         _appTesting = StateObject(wrappedValue: AppTesting(isUITesting: isUITesting))
@@ -46,7 +58,16 @@ struct MuraloomApp: App {
         _wallpaperManager = StateObject(
             wrappedValue: WallpaperManager(
                 photosService: photosService,
-                settings: settings
+                settings: settings,
+                wallpaperApplier: wallpaperApplier,
+                applicationSupportDirectoryProvider: appSupportProvider ?? {
+                    try FileManager.default.url(
+                        for: .applicationSupportDirectory,
+                        in: .userDomainMask,
+                        appropriateFor: nil,
+                        create: true
+                    )
+                }
             )
         )
     }
@@ -151,6 +172,8 @@ struct OneDriveAlbum: Codable {
 enum AppEnvironment {
     static let uiTestUserDefaultsSuiteName = "lv.andr.muraloom.uitests"
     static let uiTestPhotosModeEnvironmentKey = "MURALOOM_UI_TEST_PHOTOS_MODE"
+    static let uiTestCacheBaseDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("MuraloomUITestCache", isDirectory: true)
 
     static var isUITesting: Bool {
 #if DEBUG
@@ -171,5 +194,21 @@ enum AppEnvironment {
 #else
         return .normal
 #endif
+    }
+}
+
+private final class UITestWallpaperApplier: WallpaperApplying {
+    var screenCount: Int { 1 }
+    private var currentURL: URL?
+
+    func currentWallpaperURL() -> URL? {
+        currentURL
+    }
+
+    func setWallpaper(
+        _ wallpaperFileURL: URL,
+        options: [NSWorkspace.DesktopImageOptionKey: Any]
+    ) throws {
+        currentURL = wallpaperFileURL
     }
 }
