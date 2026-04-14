@@ -1,6 +1,7 @@
 import AppKit // For NSWorkspace
 import CryptoKit
 import Foundation
+import ImageIO
 
 protocol WallpaperApplying {
     var screenCount: Int { get }
@@ -85,6 +86,7 @@ final class WallpaperManager: ObservableObject {
     private let settings: SettingsModel
     private let wallpaperApplier: any WallpaperApplying
     private let applicationSupportDirectoryProvider: () throws -> URL
+    private let recommendedWallpaperMaxDimensionProvider: () -> Int
     private let nowProvider: () -> Date
     private var wallpaperTimer: Timer?
 
@@ -123,12 +125,14 @@ final class WallpaperManager: ObservableObject {
                 create: true
             )
         },
+        recommendedWallpaperMaxDimensionProvider: @escaping () -> Int = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension,
         nowProvider: @escaping () -> Date = Date.init
     ) {
         self.photosService = photosService
         self.settings = settings
         self.wallpaperApplier = wallpaperApplier
         self.applicationSupportDirectoryProvider = applicationSupportDirectoryProvider
+        self.recommendedWallpaperMaxDimensionProvider = recommendedWallpaperMaxDimensionProvider
         self.nowProvider = nowProvider
         self.lastSuccessfulUpdate = settings.lastSuccessfulWallpaperUpdate
         if let dir = try? ensureWallpaperDirectoryURL() {
@@ -378,7 +382,7 @@ final class WallpaperManager: ObservableObject {
             cacheIndexByItemId = loadCacheIndex(from: wallpaperDirURL)
             recalculateCacheReadyCount()
 
-            let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
+            let maxDimension = recommendedWallpaperMaxDimensionProvider()
             let currentWallpaperURL = currentManagedWallpaperURL(in: wallpaperDirURL)
 
             let inCooldown = (offlineCooldownUntil?.timeIntervalSince(nowProvider()) ?? 0) > 0
@@ -387,6 +391,7 @@ final class WallpaperManager: ObservableObject {
                 let fallback = try await applyCandidates(
                     cachedItems,
                     allowNetworkDownload: false,
+                    maxDimension: maxDimension,
                     wallpaperDirURL: wallpaperDirURL,
                     currentWallpaperURL: currentWallpaperURL
                 )
@@ -437,6 +442,7 @@ final class WallpaperManager: ObservableObject {
             let liveResult = try await applyCandidates(
                 filteredItems,
                 allowNetworkDownload: true,
+                maxDimension: maxDimension,
                 wallpaperDirURL: wallpaperDirURL,
                 currentWallpaperURL: currentWallpaperURL
             )
@@ -484,6 +490,7 @@ final class WallpaperManager: ObservableObject {
                     let fallback = try await applyCandidates(
                         cachedFallbackItems(),
                         allowNetworkDownload: false,
+                        maxDimension: recommendedWallpaperMaxDimensionProvider(),
                         wallpaperDirURL: wallpaperDirURL,
                         currentWallpaperURL: currentManagedWallpaperURL(in: wallpaperDirURL)
                     )
@@ -638,6 +645,7 @@ final class WallpaperManager: ObservableObject {
     private func applyCandidates(
         _ items: [MediaItem],
         allowNetworkDownload: Bool,
+        maxDimension: Int,
         wallpaperDirURL: URL,
         currentWallpaperURL: URL?
     ) async throws -> ApplyCandidatesResult {
@@ -654,7 +662,6 @@ final class WallpaperManager: ObservableObject {
             avoidItemId: settings.lastSetWallpaperItemId
         )
 
-        let maxDimension = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension()
         var conversionErrors: [String] = []
         var updatedSequentialIndex: Int?
 
@@ -674,7 +681,11 @@ final class WallpaperManager: ObservableObject {
                     continue
                 }
 
-                if isUsableCachedWallpaperFile(at: wallpaperFileURL) {
+                if isReusableCachedWallpaperFile(
+                    at: wallpaperFileURL,
+                    requiredMaxDimension: maxDimension,
+                    allowUndersizedFallback: allowNetworkDownload == false
+                ) {
                     updateStage = .usingCachedWallpaper(name: candidateName)
                     try setWallpaperOnAllScreens(wallpaperFileURL, options: wallpaperOptions())
                     updatedSequentialIndex = candidate.filteredIndex
@@ -988,6 +999,30 @@ final class WallpaperManager: ObservableObject {
             return true
         }
         return false
+    }
+
+    private func isReusableCachedWallpaperFile(
+        at url: URL,
+        requiredMaxDimension: Int,
+        allowUndersizedFallback: Bool
+    ) -> Bool {
+        guard isUsableCachedWallpaperFile(at: url) else { return false }
+        guard allowUndersizedFallback == false else { return true }
+        guard requiredMaxDimension > 0 else { return true }
+        guard let cachedMaxDimension = cachedWallpaperMaxDimension(at: url) else { return true }
+        return cachedMaxDimension >= requiredMaxDimension
+    }
+
+    private func cachedWallpaperMaxDimension(at url: URL) -> Int? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
+        else {
+            return nil
+        }
+
+        return max(width, height)
     }
 
     private func currentManagedWallpaperURL(in wallpaperDirURL: URL) -> URL? {

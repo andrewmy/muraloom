@@ -1,6 +1,9 @@
 import AppKit
+import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
+import UniformTypeIdentifiers
 @testable import Muraloom
 
 @MainActor
@@ -90,6 +93,43 @@ struct OfflineWallpaperManagerTests {
         )!
     }
 
+    private func makePNGData(width: Int, height: Int) -> Data {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bytesPerRow = width * 4
+        let pixels = Data(repeating: 0xA0, count: bytesPerRow * height)
+        let provider = CGDataProvider(data: pixels as CFData)!
+        let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: true,
+            intent: .defaultIntent
+        )!
+
+        let out = NSMutableData()
+        let dest = CGImageDestinationCreateWithData(out, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, image, nil)
+        #expect(CGImageDestinationFinalize(dest))
+        return out as Data
+    }
+
+    private func decodeImageSize(at url: URL) -> (width: Int, height: Int)? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let height = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
+        else {
+            return nil
+        }
+        return (width, height)
+    }
+
     private func makeMediaItems() -> [MediaItem] {
         [
             MediaItem(
@@ -109,13 +149,15 @@ struct OfflineWallpaperManagerTests {
         photosService: MockPhotosService,
         wallpaperApplier: TestWallpaperApplier,
         baseDir: URL,
-        settings: SettingsModel
+        settings: SettingsModel,
+        recommendedWallpaperMaxDimensionProvider: @escaping () -> Int = { 1 }
     ) -> WallpaperManager {
         WallpaperManager(
             photosService: photosService,
             settings: settings,
             wallpaperApplier: wallpaperApplier,
-            applicationSupportDirectoryProvider: { baseDir }
+            applicationSupportDirectoryProvider: { baseDir },
+            recommendedWallpaperMaxDimensionProvider: recommendedWallpaperMaxDimensionProvider
         )
     }
 
@@ -262,5 +304,78 @@ struct OfflineWallpaperManagerTests {
         #expect(manager.isUsingCachedFallback == false)
         #expect(manager.offlineCooldownUntil == nil)
         #expect((manager.lastUpdateError ?? "").contains("Sign-in is required"))
+    }
+
+    @Test func onlineUpdateRegeneratesUndersizedCachedWallpaperOnDemand() async throws {
+        let (defaults, suiteName) = makeUserDefaults()
+        defer { removeUserDefaults(named: suiteName) }
+
+        let baseDir = makeTempBaseDir()
+        defer { try? FileManager.default.removeItem(at: baseDir) }
+
+        let settings = prepareSettings(defaults)
+        let photosService = MockPhotosService(items: makeMediaItems(), downloadData: makePNGData(width: 40, height: 30))
+        let wallpaperApplier = TestWallpaperApplier()
+        let manager = makeManager(
+            photosService: photosService,
+            wallpaperApplier: wallpaperApplier,
+            baseDir: baseDir,
+            settings: settings,
+            recommendedWallpaperMaxDimensionProvider: { 100 }
+        )
+
+        manager.requestWallpaperUpdate(trigger: .manual)
+        await waitForUpdateCompletion(manager)
+
+        let firstWallpaperURL = try #require(wallpaperApplier.currentURL)
+        let firstSize = try #require(decodeImageSize(at: firstWallpaperURL))
+        #expect(max(firstSize.width, firstSize.height) == 40)
+        #expect(photosService.downloadCalls == 1)
+
+        photosService.downloadData = makePNGData(width: 200, height: 150)
+
+        manager.requestWallpaperUpdate(trigger: .manual)
+        await waitForUpdateCompletion(manager)
+
+        let upgradedWallpaperURL = try #require(wallpaperApplier.currentURL)
+        let upgradedSize = try #require(decodeImageSize(at: upgradedWallpaperURL))
+        #expect(upgradedWallpaperURL == firstWallpaperURL)
+        #expect(max(upgradedSize.width, upgradedSize.height) == 100)
+        #expect(photosService.downloadCalls == 2)
+        #expect(manager.isUsingCachedFallback == false)
+    }
+
+    @Test func offlineFallbackStillUsesUndersizedCachedWallpaper() async {
+        let (defaults, suiteName) = makeUserDefaults()
+        defer { removeUserDefaults(named: suiteName) }
+
+        let baseDir = makeTempBaseDir()
+        defer { try? FileManager.default.removeItem(at: baseDir) }
+
+        let settings = prepareSettings(defaults)
+        let photosService = MockPhotosService(items: makeMediaItems(), downloadData: makePNGData(width: 40, height: 30))
+        let wallpaperApplier = TestWallpaperApplier()
+        let manager = makeManager(
+            photosService: photosService,
+            wallpaperApplier: wallpaperApplier,
+            baseDir: baseDir,
+            settings: settings,
+            recommendedWallpaperMaxDimensionProvider: { 100 }
+        )
+
+        manager.requestWallpaperUpdate(trigger: .manual)
+        await waitForUpdateCompletion(manager)
+        #expect(photosService.downloadCalls == 1)
+
+        photosService.searchError = URLError(.notConnectedToInternet)
+        manager.requestWallpaperUpdate(trigger: .manual)
+        await waitForUpdateCompletion(manager)
+
+        let fallbackWallpaperURL = wallpaperApplier.currentURL
+        #expect(fallbackWallpaperURL != nil)
+        let fallbackSize = fallbackWallpaperURL.flatMap(decodeImageSize(at:))
+        #expect(max(fallbackSize?.width ?? 0, fallbackSize?.height ?? 0) == 40)
+        #expect(photosService.downloadCalls == 1)
+        #expect(manager.isUsingCachedFallback)
     }
 }
