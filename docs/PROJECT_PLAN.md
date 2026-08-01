@@ -47,6 +47,11 @@ This document outlines the technical plan for Muraloom, including the OneDrive/G
 1. **Auth approach:** native OAuth (`ASWebAuthenticationSession` + PKCE) for minimum maintenance surface.
 2. **Wallpaper source:** OneDrive **Albums** (Graph “bundle album”) instead of folders.
 
+Related wallpaper-pool references:
+
+- Multi-source wallpaper pool UX proposal: `docs/WALLPAPER_POOL_UX_SPEC.md`
+- Multi-source wallpaper pool implementation plan: `docs/WALLPAPER_POOL_IMPLEMENTATION_PLAN.md`
+
 ## What “album” means in Graph
 
 - Album is a **bundle**: a `driveItem` with `bundle.album` facet.
