@@ -36,6 +36,8 @@
 			membershipExceptions = (
 				Config.xcconfig,
 				Info.plist,
+				LibRaw.xcconfig,
+				Secrets.xcconfig,
 			);
 			target = 2576DBE12E574FBC0008C4F3 /* Muraloom */;
 		};
@@ -195,7 +197,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2710;
 				TargetAttributes = {
 					2576DBE12E574FBC0008C4F3 = {
 						CreatedOnToolsVersion = 16.4;
