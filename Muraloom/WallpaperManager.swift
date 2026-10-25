@@ -1,4 +1,5 @@
 import AppKit // For NSWorkspace
+import Combine
 import CryptoKit
 import Foundation
 import ImageIO
@@ -89,6 +90,7 @@ final class WallpaperManager: ObservableObject {
     private let recommendedWallpaperMaxDimensionProvider: () -> Int
     private let nowProvider: () -> Date
     private var wallpaperTimer: Timer?
+    private var wakeSubscription: AnyCancellable?
 
     private var inFlightUpdateTask: Task<Void, Never>?
     private var inFlightUpdateId: UUID?
@@ -139,6 +141,15 @@ final class WallpaperManager: ObservableObject {
             cacheIndexByItemId = loadCacheIndex(from: dir)
             recalculateCacheReadyCount()
         }
+        wakeSubscription = NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.didWakeNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, self.nextScheduledUpdate != nil, self.isUpdating == false else { return }
+                    // Reconcile elapsed sleep against wall-clock deadlines before rearming the timer.
+                    self.scheduleNextTimer()
+                }
+            }
     }
 
     struct WallpaperCandidate {
@@ -329,7 +340,7 @@ final class WallpaperManager: ObservableObject {
         }
 
         nextScheduledUpdate = due
-        let timeInterval = max(1, due.timeIntervalSinceNow)
+        let timeInterval = max(1, due.timeIntervalSince(now))
         wallpaperTimer = Timer(timeInterval: timeInterval, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }

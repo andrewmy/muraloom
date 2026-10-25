@@ -1,7 +1,56 @@
+import AppKit
 import Testing
 @testable import Muraloom
 
 struct WallpaperSchedulingTests {
+    @Test @MainActor func wakeRearmsOverdueScheduleAndHonorsStop() async throws {
+        let suite = "WallpaperSchedulingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        var now = Date()
+        let settings = SettingsModel(userDefaults: defaults)
+        settings.selectedAlbumId = "album"
+        settings.changeFrequency = .hourly
+        settings.isPaused = false
+        settings.lastSuccessfulWallpaperUpdate = now
+        let manager = WallpaperManager(
+            photosService: DummyOneDrivePhotosService(),
+            settings: settings,
+            applicationSupportDirectoryProvider: { directory },
+            nowProvider: { now }
+        )
+        defer { manager.stopWallpaperUpdates() }
+        manager.startWallpaperUpdates()
+        let originalDue = try #require(manager.nextScheduledUpdate)
+        now = now.addingTimeInterval(120)
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        for _ in 0..<20 { await Task.yield() }
+        #expect(manager.nextScheduledUpdate == originalDue)
+
+        now = now.addingTimeInterval(12 * 3600)
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        for _ in 0..<20 { await Task.yield() }
+        #expect(manager.nextScheduledUpdate == now.addingTimeInterval(60))
+        #expect(manager.nextScheduledUpdate != originalDue)
+
+        settings.isPaused = true
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        for _ in 0..<20 { await Task.yield() }
+        #expect(manager.nextScheduledUpdate == nil)
+
+        settings.isPaused = false
+        manager.startWallpaperUpdates()
+        manager.stopWallpaperUpdates()
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        for _ in 0..<20 { await Task.yield() }
+        #expect(manager.nextScheduledUpdate == nil)
+        #expect(manager.isUpdating == false)
+    }
+
     @Test func pausedDisablesScheduling() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let due = WallpaperManager.computeNextDueDate(
