@@ -89,8 +89,11 @@ final class WallpaperManager: ObservableObject {
     private let applicationSupportDirectoryProvider: () throws -> URL
     private let recommendedWallpaperMaxDimensionProvider: () -> Int
     private let nowProvider: () -> Date
+    private let minimumSchedulingLeadTime: TimeInterval
     private var wallpaperTimer: Timer?
     private var wakeSubscription: AnyCancellable?
+    private var scheduledAlbumId: String?
+    private var scheduledFrequency: WallpaperChangeFrequency?
 
     private var inFlightUpdateTask: Task<Void, Never>?
     private var inFlightUpdateId: UUID?
@@ -128,7 +131,8 @@ final class WallpaperManager: ObservableObject {
             )
         },
         recommendedWallpaperMaxDimensionProvider: @escaping () -> Int = WallpaperImageTranscoder.maxRecommendedDisplayPixelDimension,
-        nowProvider: @escaping () -> Date = Date.init
+        nowProvider: @escaping () -> Date = Date.init,
+        minimumSchedulingLeadTime: TimeInterval = 60
     ) {
         self.photosService = photosService
         self.settings = settings
@@ -136,6 +140,7 @@ final class WallpaperManager: ObservableObject {
         self.applicationSupportDirectoryProvider = applicationSupportDirectoryProvider
         self.recommendedWallpaperMaxDimensionProvider = recommendedWallpaperMaxDimensionProvider
         self.nowProvider = nowProvider
+        self.minimumSchedulingLeadTime = minimumSchedulingLeadTime
         self.lastSuccessfulUpdate = settings.lastSuccessfulWallpaperUpdate
         if let dir = try? ensureWallpaperDirectoryURL() {
             cacheIndexByItemId = loadCacheIndex(from: dir)
@@ -241,6 +246,13 @@ final class WallpaperManager: ObservableObject {
     }
 
     func startWallpaperUpdates() {
+        // Opening the menu must not postpone an existing deadline, including overdue work.
+        if wallpaperTimer?.isValid == true,
+           settings.isPaused == false,
+           scheduledAlbumId == settings.selectedAlbumId,
+           scheduledFrequency == settings.changeFrequency {
+            return
+        }
         scheduleNextTimer()
     }
 
@@ -333,6 +345,7 @@ final class WallpaperManager: ObservableObject {
             hasSelectedAlbum: hasSelectedAlbum,
             isPaused: settings.isPaused,
             lastAttemptDate: lastAttemptDate,
+            minimumLeadTime: minimumSchedulingLeadTime,
             offlineCooldownUntil: offlineCooldownUntil
         ) else {
             nextScheduledUpdate = nil
@@ -340,6 +353,8 @@ final class WallpaperManager: ObservableObject {
         }
 
         nextScheduledUpdate = due
+        scheduledAlbumId = settings.selectedAlbumId
+        scheduledFrequency = settings.changeFrequency
         let timeInterval = max(1, due.timeIntervalSince(now))
         wallpaperTimer = Timer(timeInterval: timeInterval, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
