@@ -61,7 +61,7 @@ enum OneDriveAuthError: Error, LocalizedError {
 @MainActor
 final class OneDriveAuthService: AuthService {
     private let config: OneDriveConfig
-    private let keychain = OneDriveTokenKeychain()
+    private let tokenStore: any OneDriveTokenStore
     private var authSession: ASWebAuthenticationSession?
     private let presentationContextProvider = WebAuthPresentationContextProvider()
 
@@ -71,11 +71,12 @@ final class OneDriveAuthService: AuthService {
         }
     }
 
-    init(config: OneDriveConfig = OneDriveConfig()) {
+    init(config: OneDriveConfig = OneDriveConfig(), tokenStore: any OneDriveTokenStore = OneDriveTokenKeychain()) {
         self.config = config
+        self.tokenStore = tokenStore
         super.init()
 
-        self.token = keychain.load()
+        self.token = tokenStore.load()
         self.isSignedIn = self.token != nil
         self.signedInUsername = nil
     }
@@ -83,7 +84,7 @@ final class OneDriveAuthService: AuthService {
     override func signOut() {
         token = nil
         signedInUsername = nil
-        keychain.delete()
+        tokenStore.delete()
     }
 
     override func validAccessToken() async throws -> String {
@@ -92,13 +93,13 @@ final class OneDriveAuthService: AuthService {
 
         guard let refreshToken = currentToken.refreshToken, refreshToken.isEmpty == false else {
             self.token = nil
-            keychain.delete()
+            tokenStore.delete()
             throw OneDriveAuthError.providerError(details: "Sign-in session expired. Please sign in again.")
         }
 
         let refreshed = try await refreshAccessToken(refreshToken: refreshToken)
         self.token = refreshed
-        keychain.save(refreshed)
+        tokenStore.save(refreshed)
         return refreshed.accessToken
     }
 
@@ -145,7 +146,7 @@ final class OneDriveAuthService: AuthService {
 
         let token = try await exchangeCodeForToken(code: code, codeVerifier: pkce.codeVerifier)
         self.token = token
-        keychain.save(token)
+        tokenStore.save(token)
     }
 
     private func startWebAuthSession(url: URL, callbackScheme: String?) async throws -> URL {
@@ -295,7 +296,7 @@ final class OneDriveAuthService: AuthService {
     }
 }
 
-private struct OneDriveToken: Codable {
+struct OneDriveToken: Codable {
     let accessToken: String
     let refreshToken: String?
     let expiresAt: Date
@@ -398,7 +399,13 @@ private extension String {
     }
 }
 
-private final class OneDriveTokenKeychain {
+protocol OneDriveTokenStore {
+    func load() -> OneDriveToken?
+    func save(_ token: OneDriveToken)
+    func delete()
+}
+
+final class OneDriveTokenKeychain: OneDriveTokenStore {
     private let service = "lv.andr.muraloom.onedrive"
     private let account = "token"
 

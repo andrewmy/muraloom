@@ -20,7 +20,7 @@ struct MuraloomApp: App {
         let wallpaperApplier: any WallpaperApplying
         let appSupportProvider: (() throws -> URL)?
 
-        if isUITesting {
+        if AppEnvironment.usesTestFixtures {
             let defaults = UserDefaults(suiteName: AppEnvironment.uiTestUserDefaultsSuiteName)
             defaults?.removePersistentDomain(forName: AppEnvironment.uiTestUserDefaultsSuiteName)
 
@@ -174,6 +174,16 @@ enum AppEnvironment {
     static let uiTestPhotosModeEnvironmentKey = "MURALOOM_UI_TEST_PHOTOS_MODE"
     static let uiTestCacheBaseDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("MuraloomUITestCache", isDirectory: true)
+
+    // Hosted unit tests initialize App before any test body runs.
+    static var isUnitTesting: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
+
+    static var usesTestFixtures: Bool { isUITesting || isUnitTesting }
 
     static var isUITesting: Bool {
 #if DEBUG
