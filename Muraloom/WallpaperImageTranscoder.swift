@@ -361,17 +361,6 @@ enum WallpaperImageTranscoder {
         }
 
         let maxDimension = max(1, maxDimension)
-        func thumbnailOptionsPreferEmbedded(applyTransform: Bool) -> [CFString: Any] {
-            [
-                // Prefer embedded thumbnails/previews when present (important for RAW formats like ARW
-                // where generating a thumbnail from the full image can fail).
-                kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-                kCGImageSourceCreateThumbnailWithTransform: applyTransform,
-                kCGImageSourceThumbnailMaxPixelSize: maxDimension,
-                kCGImageSourceShouldCache: false,
-            ]
-        }
-
         func thumbnailOptionsForceDecode(applyTransform: Bool) -> [CFString: Any] {
             [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -382,11 +371,8 @@ enum WallpaperImageTranscoder {
         }
 
         func createThumbnail(at index: Int) -> CGImage? {
-            // First: use embedded thumbnail/preview (best-effort, avoids decoding RAW).
-            CGImageSourceCreateThumbnailAtIndex(source, index, thumbnailOptionsPreferEmbedded(applyTransform: true) as CFDictionary)
-                ?? CGImageSourceCreateThumbnailAtIndex(source, index, thumbnailOptionsPreferEmbedded(applyTransform: false) as CFDictionary)
-                // Fallback: force decoding the image to generate a thumbnail.
-                ?? CGImageSourceCreateThumbnailAtIndex(source, index, thumbnailOptionsForceDecode(applyTransform: true) as CFDictionary)
+            // Embedded previews can be only 512 px; always downsample the full image.
+            CGImageSourceCreateThumbnailAtIndex(source, index, thumbnailOptionsForceDecode(applyTransform: true) as CFDictionary)
                 ?? CGImageSourceCreateThumbnailAtIndex(source, index, thumbnailOptionsForceDecode(applyTransform: false) as CFDictionary)
         }
 

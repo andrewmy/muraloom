@@ -80,6 +80,41 @@ struct WallpaperImageTranscoderTests {
         }
     }
 
+    @Test func downsamplingUsesFullImageInsteadOfEmbeddedThumbnail() throws {
+        let image = makeCGImage(width: 1024, height: 768)
+        let original = encode(image, as: .jpeg)
+        let preview = encode(makeCGImage(width: 160, height: 120), as: .jpeg)
+        // EXIF IFD1 points to a deliberately small JPEG preview at TIFF offset 44.
+        var exif = Data([
+            0x45, 0x78, 0x69, 0x66, 0, 0,
+            0x49, 0x49, 42, 0, 8, 0, 0, 0,
+            0, 0, 14, 0, 0, 0,
+            2, 0,
+            1, 2, 4, 0, 1, 0, 0, 0, 44, 0, 0, 0,
+            2, 2, 4, 0, 1, 0, 0, 0,
+        ])
+        var previewLength = UInt32(preview.count).littleEndian
+        withUnsafeBytes(of: &previewLength) { exif.append(contentsOf: $0) }
+        exif.append(contentsOf: [0, 0, 0, 0])
+        exif.append(preview)
+        let segmentLength = exif.count + 2
+        var data = Data([0xFF, 0xD8, 0xFF, 0xE1, UInt8(segmentLength >> 8), UInt8(segmentLength & 0xFF)])
+        data.append(exif)
+        data.append(original.dropFirst(2))
+
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        let embedded = try #require(CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceThumbnailMaxPixelSize: 512,
+        ] as CFDictionary))
+        #expect(embedded.width < 512)
+
+        let jpeg = try WallpaperImageTranscoder.prepareWallpaperJPEG(from: data as Data, maxDimension: 512)
+        let size = try #require(decodePixelSize(jpeg))
+        #expect(size.w == 512)
+        #expect(size.h == 384)
+    }
+
     @Test func asyncWrapperTranscodesImage() async throws {
         let image = makeCGImage(width: 1024, height: 768)
         let png = encode(image, as: .png)
